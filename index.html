@@ -150,9 +150,12 @@
                     <label for="useCountdown" class="text-sm">Countdown-Modus</label>
                     <input type="number" id="countdownMinutes" placeholder="Min" min="1" max="480" value="60" class="w-20 bg-gray-700 border border-gray-600 rounded p-2 text-sm ml-auto" disabled>
                 </div>
-                <div class="mt-3 pt-3 border-t border-gray-700">
-                    <button onclick="testAlarm()" class="w-full py-2 bg-orange-700 hover:bg-orange-600 rounded-lg text-sm font-medium">
+                <div class="mt-3 pt-3 border-t border-gray-700 flex gap-2">
+                    <button onclick="testAlarm()" class="flex-1 py-2 bg-orange-700 hover:bg-orange-600 rounded-lg text-sm font-medium">
                         🔔 Alarm testen
+                    </button>
+                    <button onclick="checkNotificationStatus()" id="btnNotifyStatus" class="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium">
+                        🔕 Benachrichtigung
                     </button>
                 </div>
             </div>
@@ -712,6 +715,9 @@
                 document.getElementById('btnSortOrder').title = 'Sortierung: Älteste zuerst';
             }
             
+            // Notification-Button Status aktualisieren
+            updateNotificationButton();
+            
             updateTodayView();
         }
 
@@ -745,6 +751,15 @@
             
             // Audio für Alarm vorbereiten (muss bei User-Klick passieren!)
             initAudioContext();
+            
+            // Benachrichtigungs-Berechtigung anfordern (wichtig für Hintergrund-Alarm!)
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        showToast('✅ Benachrichtigungen aktiviert!');
+                    }
+                });
+            };
             
             // Countdown-Dauer merken
             const countdownMinutes = parseInt(document.getElementById('countdownMinutes').value) || 60;
@@ -948,26 +963,43 @@
         }
 
         function notifyTimerEnd() {
-            // 1. Alarm-Sound abspielen
-            playAlarmSound();
+            // 1. System-Benachrichtigung (funktioniert auch im Hintergrund!)
+            sendSystemNotification();
             
             // 2. Vibration auf Mobilgeräten (3x kurz)
             if ('vibrate' in navigator) {
-                navigator.vibrate([200, 100, 200, 100, 200]);
+                navigator.vibrate([500, 200, 500, 200, 500, 200, 500]);
             }
             
-            // 3. Browser-Benachrichtigung
-            if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('⏰ Countdown beendet!', { 
-                    body: 'Deine Zeit ist abgelaufen.',
+            // 3. Sound versuchen (funktioniert nur wenn App aktiv)
+            tryPlayAlarmSound();
+            
+            // 4. Visuelles Modal
+            showAlarmModal();
+        }
+        
+        function sendSystemNotification() {
+            if (!('Notification' in window)) return;
+            
+            if (Notification.permission === 'granted') {
+                // Notification mit Tag damit sie nicht doppelt erscheint
+                const notification = new Notification('⏰ Zeit abgelaufen!', {
+                    body: 'Dein Countdown ist beendet.',
                     icon: 'icon-192.png',
                     tag: 'timer-alarm',
-                    requireInteraction: true
+                    requireInteraction: true, // Bleibt bis User reagiert
+                    silent: false // System-Sound abspielen!
                 });
+                
+                // Bei Klick auf Notification: App in Vordergrund
+                notification.onclick = () => {
+                    window.focus();
+                    notification.close();
+                };
+            } else if (Notification.permission === 'default') {
+                // Berechtigung noch nicht erteilt - für nächstes Mal anfordern
+                Notification.requestPermission();
             }
-            
-            // 4. Visuelles Feedback - Bildschirm blinkt
-            showAlarmModal();
         }
         
         function playAlarmSound() {
@@ -1026,8 +1058,8 @@
                     <div class="text-6xl mb-4 animate-bounce">⏰</div>
                     <h2 class="text-2xl font-bold text-red-400 mb-2">Zeit abgelaufen!</h2>
                     <p class="text-gray-300 mb-6">Dein Countdown ist beendet.</p>
-                    <button onclick="closeAlarmModal()" class="w-full py-4 bg-red-600 hover:bg-red-500 rounded-xl text-lg font-bold transition-all">
-                        OK, verstanden
+                    <button onclick="playAlarmAndClose()" class="w-full py-4 bg-red-600 hover:bg-red-500 rounded-xl text-lg font-bold transition-all flex items-center justify-center gap-2">
+                        🔔 Alarm stoppen
                     </button>
                 </div>
             `;
@@ -1046,6 +1078,33 @@
                 }
             `;
             document.head.appendChild(style);
+            
+            // Versuche Sound abzuspielen (funktioniert evtl. nicht aus Hintergrund)
+            tryPlayAlarmSound();
+        }
+        
+        function tryPlayAlarmSound() {
+            // Versuche AudioContext zu reaktivieren
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().then(() => {
+                    playAlarmSound();
+                }).catch(() => {
+                    console.log('Audio konnte nicht aktiviert werden - User-Interaktion nötig');
+                });
+            } else {
+                playAlarmSound();
+            }
+        }
+        
+        function playAlarmAndClose() {
+            // User klickt -> Audio funktioniert garantiert
+            initAudioContext();
+            setTimeout(() => {
+                playAlarmSound();
+                setTimeout(() => {
+                    closeAlarmModal();
+                }, 2500); // Modal schließt nach Sound
+            }, 100);
         }
         
         function closeAlarmModal() {
@@ -1063,6 +1122,65 @@
                 playAlarmSound();
                 showToast('🔔 Alarm-Test!');
             }, 100);
+        }
+        
+        function checkNotificationStatus() {
+            if (!('Notification' in window)) {
+                alert('❌ Dein Browser unterstützt keine Benachrichtigungen.');
+                return;
+            }
+            
+            if (Notification.permission === 'granted') {
+                // Test-Notification senden
+                new Notification('✅ Test-Benachrichtigung', {
+                    body: 'Benachrichtigungen funktionieren!',
+                    icon: 'icon-192.png',
+                    tag: 'test',
+                    silent: false
+                });
+                showToast('✅ Benachrichtigungen sind aktiv!');
+            } else if (Notification.permission === 'denied') {
+                alert('❌ Benachrichtigungen sind blockiert.\n\n' +
+                      '📱 iPhone: Einstellungen → Safari → Erweitert → Website-Daten → Erlauben\n\n' +
+                      'Oder: App zum Home-Bildschirm hinzufügen und dort Benachrichtigungen erlauben.');
+            } else {
+                Notification.requestPermission().then(permission => {
+                    updateNotificationButton();
+                    if (permission === 'granted') {
+                        showToast('✅ Benachrichtigungen aktiviert!');
+                        new Notification('✅ Benachrichtigungen aktiviert!', {
+                            body: 'Du wirst jetzt benachrichtigt wenn der Timer abläuft.',
+                            icon: 'icon-192.png',
+                            silent: false
+                        });
+                    }
+                });
+            }
+        }
+        
+        function updateNotificationButton() {
+            const btn = document.getElementById('btnNotifyStatus');
+            if (!btn) return;
+            
+            if (!('Notification' in window)) {
+                btn.innerHTML = '❌ Nicht verfügbar';
+                btn.className = 'flex-1 py-2 bg-gray-700 rounded-lg text-sm font-medium opacity-50';
+                return;
+            }
+            
+            switch(Notification.permission) {
+                case 'granted':
+                    btn.innerHTML = '🔔 Aktiv';
+                    btn.className = 'flex-1 py-2 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-medium';
+                    break;
+                case 'denied':
+                    btn.innerHTML = '🔕 Blockiert';
+                    btn.className = 'flex-1 py-2 bg-red-700 hover:bg-red-600 rounded-lg text-sm font-medium';
+                    break;
+                default:
+                    btn.innerHTML = '🔕 Aktivieren';
+                    btn.className = 'flex-1 py-2 bg-yellow-700 hover:bg-yellow-600 rounded-lg text-sm font-medium';
+            }
         }
 
         // ==================== LOCATION ====================
@@ -1798,6 +1916,10 @@
                 if (timerSeconds <= 0) {
                     timerSeconds = 0;
                     stopTimer();
+                    // AudioContext reaktivieren versuchen
+                    if (audioCtx && audioCtx.state === 'suspended') {
+                        audioCtx.resume();
+                    }
                     notifyTimerEnd();
                     return;
                 }
