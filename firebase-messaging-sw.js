@@ -12,7 +12,7 @@ firebase.initializeApp({
   storageBucket: "appazeit.firebasestorage.app",
   messagingSenderId: "977328058000",
   appId: "1:977328058000:web:360b79579689552423b215"
-};
+});
 
 const messaging = firebase.messaging();
 
