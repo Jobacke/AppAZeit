@@ -218,6 +218,18 @@
                 <button onclick="setDashboardPeriod('month')" id="dash-month" class="px-4 py-2 bg-gray-700 rounded-lg text-sm">Dieser Monat</button>
                 <button onclick="setDashboardPeriod('year')" id="dash-year" class="px-4 py-2 bg-gray-700 rounded-lg text-sm">Dieses Jahr</button>
                 <button onclick="setDashboardPeriod('all')" id="dash-all" class="px-4 py-2 bg-gray-700 rounded-lg text-sm">Alles</button>
+                <button onclick="setDashboardPeriod('custom')" id="dash-custom" class="px-4 py-2 bg-gray-700 rounded-lg text-sm">📅 Zeitraum</button>
+            </div>
+
+            <div id="dashboardDateRange" class="hidden grid grid-cols-2 gap-3 bg-gray-800 rounded-xl p-3 border border-gray-700">
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Von</label>
+                    <input type="date" id="dashFrom" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm" onchange="updateDashboard()">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Bis</label>
+                    <input type="date" id="dashTo" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm" onchange="updateDashboard()">
+                </div>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -274,12 +286,13 @@
                         <option value="today">Heute</option>
                         <option value="week">Diese Woche</option>
                         <option value="month">Dieser Monat</option>
+                        <option value="year">Dieses Jahr</option>
                         <option value="all">Alle Einträge</option>
-                        <option value="custom">Benutzerdefiniert</option>
+                        <option value="custom">📅 Benutzerdefiniert...</option>
                     </select>
                 </div>
 
-                <div id="customDateRange" class="hidden grid grid-cols-2 gap-3">
+                <div id="customDateRange" class="grid grid-cols-2 gap-3 hidden">
                     <div>
                         <label class="text-xs text-gray-400 mb-1 block">Von</label>
                         <input type="date" id="exportFrom" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
@@ -372,6 +385,9 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
         
+        // Auth Persistence auf LOCAL setzen (wichtig für iOS Safari!)
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        
         // Offline-Persistenz aktivieren
         db.enablePersistence({ synchronizeTabs: true }).catch(err => {
             console.log('Offline-Persistenz nicht verfügbar:', err.code);
@@ -407,31 +423,52 @@
         };
 
         // ==================== AUTHENTICATION ====================
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                currentUser = user;
-                showApp();
-                setupRealtimeSync();
-                restoreTimerState();
-            } else {
-                currentUser = null;
-                showLogin();
-                cleanupSync();
+        let authInitialized = false;
+        
+        // Erst Redirect-Ergebnis prüfen, dann Auth-State
+        auth.getRedirectResult().then(result => {
+            if (result.user) {
+                console.log('✅ Login via Redirect erfolgreich:', result.user.email);
             }
+        }).catch(err => {
+            console.error('Redirect Fehler:', err);
+            if (err.code === 'auth/account-exists-with-different-credential') {
+                alert('Dieses Konto existiert bereits mit anderen Anmeldedaten.');
+            }
+        }).finally(() => {
+            // Nach Redirect-Check den Auth-State beobachten
+            auth.onAuthStateChanged(user => {
+                console.log('Auth State Changed:', user ? user.email : 'null');
+                if (user) {
+                    currentUser = user;
+                    showApp();
+                    setupRealtimeSync();
+                    restoreTimerState();
+                } else {
+                    currentUser = null;
+                    showLogin();
+                    cleanupSync();
+                }
+            });
         });
 
         function signInWithGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
+            provider.setCustomParameters({
+                prompt: 'select_account'
+            });
             
-            // Auf Mobilgeräten Redirect verwenden (Popup funktioniert nicht zuverlässig)
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            // Immer Redirect auf iOS Safari verwenden
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
             
-            if (isMobile) {
+            if (isIOS || isSafari) {
+                console.log('Using Redirect (iOS/Safari)');
                 auth.signInWithRedirect(provider);
             } else {
+                console.log('Using Popup');
                 auth.signInWithPopup(provider).catch(err => {
-                    console.error('Login Fehler:', err);
-                    // Fallback zu Redirect bei Popup-Blockierung
+                    console.error('Popup Fehler:', err);
                     if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
                         auth.signInWithRedirect(provider);
                     } else {
@@ -440,18 +477,6 @@
                 });
             }
         }
-        
-        // Redirect-Ergebnis beim Laden der Seite prüfen
-        auth.getRedirectResult().then(result => {
-            if (result.user) {
-                console.log('Login via Redirect erfolgreich');
-            }
-        }).catch(err => {
-            console.error('Redirect Login Fehler:', err);
-            if (err.code !== 'auth/credential-already-in-use') {
-                alert('Login fehlgeschlagen: ' + err.message);
-            }
-        });
 
         function signOut() {
             auth.signOut();
@@ -1169,11 +1194,32 @@
         // ==================== DASHBOARD ====================
         function setDashboardPeriod(period) {
             dashboardPeriod = period;
-            ['week', 'month', 'year', 'all'].forEach(p => {
+            ['week', 'month', 'year', 'all', 'custom'].forEach(p => {
                 const btn = document.getElementById(`dash-${p}`);
-                btn.classList.toggle('bg-blue-600', p === period);
-                btn.classList.toggle('bg-gray-700', p !== period);
+                if (btn) {
+                    btn.classList.toggle('bg-blue-600', p === period);
+                    btn.classList.toggle('bg-gray-700', p !== period);
+                }
             });
+            
+            const dateRange = document.getElementById('dashboardDateRange');
+            if (period === 'custom') {
+                dateRange.classList.remove('hidden');
+                // Standardwerte setzen falls leer
+                const today = new Date();
+                const monthAgo = new Date(today);
+                monthAgo.setMonth(monthAgo.getMonth() - 1);
+                
+                if (!document.getElementById('dashFrom').value) {
+                    document.getElementById('dashFrom').value = monthAgo.toISOString().split('T')[0];
+                }
+                if (!document.getElementById('dashTo').value) {
+                    document.getElementById('dashTo').value = today.toISOString().split('T')[0];
+                }
+            } else {
+                dateRange.classList.add('hidden');
+            }
+            
             updateDashboard();
         }
 
@@ -1236,6 +1282,13 @@
                 case 'year':
                     const yearStart = new Date(today.getFullYear(), 0, 1);
                     return entries.filter(e => new Date(e.datum) >= yearStart);
+                case 'custom':
+                    const from = document.getElementById('dashFrom').value;
+                    const to = document.getElementById('dashTo').value;
+                    if (from && to) {
+                        return entries.filter(e => e.datum >= from && e.datum <= to);
+                    }
+                    return entries;
                 default:
                     return entries;
             }
@@ -1244,7 +1297,24 @@
         // ==================== EXPORT ====================
         function toggleCustomDates() {
             const period = document.getElementById('exportPeriod').value;
-            document.getElementById('customDateRange').classList.toggle('hidden', period !== 'custom');
+            const customRange = document.getElementById('customDateRange');
+            
+            if (period === 'custom') {
+                customRange.classList.remove('hidden');
+                // Standardwerte setzen: Letzter Monat
+                const today = new Date();
+                const monthAgo = new Date(today);
+                monthAgo.setMonth(monthAgo.getMonth() - 1);
+                
+                if (!document.getElementById('exportFrom').value) {
+                    document.getElementById('exportFrom').value = monthAgo.toISOString().split('T')[0];
+                }
+                if (!document.getElementById('exportTo').value) {
+                    document.getElementById('exportTo').value = today.toISOString().split('T')[0];
+                }
+            } else {
+                customRange.classList.add('hidden');
+            }
         }
 
         function getExportEntries() {
@@ -1266,11 +1336,18 @@
                     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
                     filtered = entries.filter(e => new Date(e.datum) >= monthStart);
                     break;
+                case 'year':
+                    const yearStart = new Date(today.getFullYear(), 0, 1);
+                    filtered = entries.filter(e => new Date(e.datum) >= yearStart);
+                    break;
                 case 'custom':
                     const from = document.getElementById('exportFrom').value;
                     const to = document.getElementById('exportTo').value;
                     if (from && to) {
                         filtered = entries.filter(e => e.datum >= from && e.datum <= to);
+                    } else {
+                        alert('Bitte Von- und Bis-Datum auswählen!');
+                        return [];
                     }
                     break;
             }
