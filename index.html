@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e40af">
+    <title>Zeiterfassung Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <style>
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.7; }
+            100% { transform: scale(0.95); opacity: 1; }
+        }
+        .timer-active { animation: pulse-ring 1.5s ease-in-out infinite; }
+        .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; }
+        input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+        .modal-backdrop { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+        body { -webkit-tap-highlight-color: transparent; }
+        .sync-indicator { transition: all 0.3s; }
+        .sync-indicator.syncing { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    
+    <!-- ==================== LOGIN SCREEN ==================== -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-2xl p-8 max-w-md w-full border border-gray-700 text-center">
+            <div class="text-6xl mb-4">⏱️</div>
+            <h1 class="text-2xl font-bold mb-2">Zeiterfassung Pro</h1>
+            <p class="text-gray-400 mb-8">Cloud-Synchronisation für alle Geräte</p>
+            
+            <button onclick="signInWithGoogle()" id="loginBtn" class="w-full py-4 bg-white text-gray-800 rounded-xl font-medium flex items-center justify-center gap-3 hover:bg-gray-100 transition-all">
+                <svg class="w-6 h-6" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Mit Google anmelden
+            </button>
+            
+            <div class="mt-6 text-xs text-gray-500">
+                Deine Daten werden sicher in der Cloud gespeichert
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN APP ==================== -->
+    <div id="app" class="max-w-2xl mx-auto pb-20 hidden">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-blue-800 to-blue-600 p-4 sticky top-0 z-40 shadow-lg">
+            <div class="flex items-center justify-between">
+                <h1 class="text-xl font-bold flex items-center gap-2">
+                    <span class="text-2xl">⏱️</span>
+                    Zeiterfassung Pro
+                </h1>
+                <div class="flex items-center gap-2">
+                    <div id="syncStatus" class="sync-indicator text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
+                        ☁️ Sync
+                    </div>
+                    <button onclick="showUserMenu()" id="userAvatar" class="w-8 h-8 rounded-full bg-gray-700 overflow-hidden">
+                        <img id="userPhoto" src="" alt="" class="w-full h-full object-cover">
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- User Menu Dropdown -->
+        <div id="userMenu" class="hidden absolute right-4 top-16 bg-gray-800 rounded-xl border border-gray-700 shadow-xl z-50 w-64">
+            <div class="p-4 border-b border-gray-700">
+                <div id="userName" class="font-medium"></div>
+                <div id="userEmail" class="text-xs text-gray-400"></div>
+            </div>
+            <div class="p-2">
+                <button onclick="signOut()" class="w-full text-left px-4 py-2 hover:bg-gray-700 rounded-lg text-sm text-red-400">
+                    🚪 Abmelden
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="flex bg-gray-800 border-b border-gray-700 sticky top-16 z-30">
+            <button onclick="showTab('timer')" id="tab-timer" class="flex-1 py-3 text-sm font-medium tab-active">⏱️ Timer</button>
+            <button onclick="showTab('entries')" id="tab-entries" class="flex-1 py-3 text-sm font-medium text-gray-400">📋 Einträge</button>
+            <button onclick="showTab('projects')" id="tab-projects" class="flex-1 py-3 text-sm font-medium text-gray-400">📁 Projekte</button>
+            <button onclick="showTab('dashboard')" id="tab-dashboard" class="flex-1 py-3 text-sm font-medium text-gray-400">📊 Stats</button>
+            <button onclick="showTab('export')" id="tab-export" class="flex-1 py-3 text-sm font-medium text-gray-400">💾 Export</button>
+        </nav>
+
+        <!-- Timer Tab -->
+        <div id="content-timer" class="p-4 space-y-4">
+            <!-- Projekt & Ort Auswahl -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Projekt</label>
+                    <select id="currentProject" class="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm">
+                        <option value="">-- Kein Projekt --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Arbeitsort</label>
+                    <div class="flex gap-2">
+                        <button onclick="setLocation(true)" id="btn-ho" class="flex-1 py-3 rounded-lg text-sm font-medium bg-blue-600">🏠 HO</button>
+                        <button onclick="setLocation(false)" id="btn-office" class="flex-1 py-3 rounded-lg text-sm font-medium bg-gray-700">🏢 Büro</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tätigkeit -->
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Tätigkeit (optional)</label>
+                <input type="text" id="currentActivity" placeholder="z.B. Meeting, Dokumentation..." class="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm">
+            </div>
+
+            <!-- Timer Display -->
+            <div id="timerDisplay" class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 text-center border border-gray-700">
+                <div id="timerValue" class="text-6xl font-mono font-bold text-blue-400 mb-4">00:00:00</div>
+                <div id="timerStatus" class="text-gray-400 text-sm mb-4">Bereit zum Starten</div>
+                <div class="flex gap-3 justify-center">
+                    <button onclick="toggleTimer()" id="btnStartStop" class="px-8 py-4 bg-green-600 hover:bg-green-500 rounded-xl text-lg font-bold transition-all">
+                        ▶️ Start
+                    </button>
+                    <button onclick="resetTimer()" class="px-6 py-4 bg-gray-700 hover:bg-gray-600 rounded-xl text-lg transition-all">
+                        🔄
+                    </button>
+                </div>
+            </div>
+
+            <!-- Countdown Option -->
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" id="useCountdown" class="w-5 h-5 rounded" onchange="toggleCountdownMode()">
+                    <label for="useCountdown" class="text-sm">Countdown-Modus</label>
+                    <input type="number" id="countdownMinutes" placeholder="Min" min="1" max="480" value="60" class="w-20 bg-gray-700 border border-gray-600 rounded p-2 text-sm ml-auto" disabled>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-700">
+                    <button onclick="testAlarm()" class="w-full py-2 bg-orange-700 hover:bg-orange-600 rounded-lg text-sm font-medium">
+                        🔔 Alarm testen
+                    </button>
+                </div>
+            </div>
+
+            <!-- Manueller Eintrag -->
+            <details class="bg-gray-800 rounded-xl border border-gray-700">
+                <summary class="p-4 cursor-pointer text-sm font-medium">➕ Manueller Eintrag</summary>
+                <div class="p-4 pt-0 space-y-3">
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="text-xs text-gray-400">Datum</label>
+                            <input type="date" id="manualDate" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400">Start</label>
+                            <input type="time" id="manualStart" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400">Ende</label>
+                            <input type="time" id="manualEnd" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm">
+                        </div>
+                    </div>
+                    <button onclick="addManualEntry()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium">
+                        ✅ Eintrag hinzufügen
+                    </button>
+                </div>
+            </details>
+
+            <!-- Heutige Einträge -->
+            <div class="bg-gray-800 rounded-xl border border-gray-700">
+                <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                    <h3 class="font-medium">📅 Heute</h3>
+                    <span id="todayTotal" class="text-blue-400 font-mono">0.00 h</span>
+                </div>
+                <div id="todayEntries" class="max-h-64 overflow-y-auto"></div>
+            </div>
+        </div>
+
+        <!-- Einträge Tab -->
+        <div id="content-entries" class="p-4 space-y-4 hidden">
+            <div class="flex gap-2">
+                <input type="date" id="filterDate" class="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm" onchange="filterEntries()">
+                <select id="filterProject" class="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm" onchange="filterEntries()">
+                    <option value="">Alle Projekte</option>
+                </select>
+                <button onclick="toggleSortOrder()" id="btnSortOrder" class="px-4 bg-gray-700 hover:bg-gray-600 rounded-lg text-xl" title="Sortierung ändern">
+                    ⬇️
+                </button>
+            </div>
+            <div id="entriesList" class="space-y-2"></div>
+            <div id="entriesStats" class="bg-gray-800 rounded-xl p-4 text-center text-sm text-gray-400"></div>
+        </div>
+
+        <!-- Projekte Tab -->
+        <div id="content-projects" class="p-4 space-y-4 hidden">
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <h3 class="font-medium mb-3">➕ Neues Projekt</h3>
+                <div class="flex gap-2">
+                    <input type="text" id="newProjectName" placeholder="Projektname" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                    <input type="color" id="newProjectColor" value="#3B82F6" class="w-12 h-12 rounded-lg cursor-pointer">
+                    <button onclick="addProject()" class="px-4 bg-green-600 hover:bg-green-500 rounded-lg">✅</button>
+                </div>
+            </div>
+            <div id="projectsList" class="space-y-2"></div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="content-dashboard" class="p-4 space-y-4 hidden">
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="setDashboardPeriod('week')" id="dash-week" class="px-4 py-2 bg-blue-600 rounded-lg text-sm">Diese Woche</button>
+                <button onclick="setDashboardPeriod('month')" id="dash-month" class="px-4 py-2 bg-gray-700 rounded-lg text-sm">Dieser Monat</button>
+                <button onclick="setDashboardPeriod('year')" id="dash-year" class="px-4 py-2 bg-gray-700 rounded-lg text-sm">Dieses Jahr</button>
+                <button onclick="setDashboardPeriod('all')" id="dash-all" class="px-4 py-2 bg-gray-700 rounded-lg text-sm">Alles</button>
+                <button onclick="setDashboardPeriod('custom')" id="dash-custom" class="px-4 py-2 bg-gray-700 rounded-lg text-sm">📅 Zeitraum</button>
+            </div>
+
+            <div id="dashboardDateRange" class="hidden grid grid-cols-2 gap-3 bg-gray-800 rounded-xl p-3 border border-gray-700">
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Von</label>
+                    <input type="date" id="dashFrom" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm" onchange="updateDashboard()">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Bis</label>
+                    <input type="date" id="dashTo" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm" onchange="updateDashboard()">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-gradient-to-br from-blue-900 to-blue-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold" id="statTotalHours">0</div>
+                    <div class="text-xs text-blue-300">Stunden gesamt</div>
+                </div>
+                <div class="bg-gradient-to-br from-green-900 to-green-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold" id="statAvgPerDay">0</div>
+                    <div class="text-xs text-green-300">Ø Stunden/Tag</div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-900 to-purple-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold" id="statWorkDays">0</div>
+                    <div class="text-xs text-purple-300">Arbeitstage</div>
+                </div>
+                <div class="bg-gradient-to-br from-orange-900 to-orange-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold" id="statEntries">0</div>
+                    <div class="text-xs text-orange-300">Einträge</div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <h3 class="font-medium mb-3">🏠 Homeoffice vs. 🏢 Büro</h3>
+                <div class="flex gap-4">
+                    <div class="flex-1 text-center">
+                        <div class="text-2xl font-bold text-blue-400" id="statHomeoffice">0%</div>
+                        <div class="text-xs text-gray-400">Homeoffice</div>
+                    </div>
+                    <div class="flex-1 text-center">
+                        <div class="text-2xl font-bold text-orange-400" id="statOffice">0%</div>
+                        <div class="text-xs text-gray-400">Büro</div>
+                    </div>
+                </div>
+                <div class="mt-3 h-4 bg-gray-700 rounded-full overflow-hidden flex">
+                    <div id="hoBar" class="bg-blue-500 transition-all" style="width: 50%"></div>
+                    <div id="officeBar" class="bg-orange-500 transition-all" style="width: 50%"></div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <h3 class="font-medium mb-3">📊 Stunden nach Projekt</h3>
+                <div id="projectStats" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- Export Tab -->
+        <div id="content-export" class="p-4 space-y-4 hidden">
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 space-y-4">
+                <h3 class="font-medium">📤 Daten exportieren</h3>
+                
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Zeitraum</label>
+                    <select id="exportPeriod" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm" onchange="toggleCustomDates()">
+                        <option value="today">Heute</option>
+                        <option value="week">Diese Woche</option>
+                        <option value="month">Dieser Monat</option>
+                        <option value="year">Dieses Jahr</option>
+                        <option value="all">Alle Einträge</option>
+                        <option value="custom">📅 Benutzerdefiniert...</option>
+                    </select>
+                </div>
+
+                <div id="customDateRange" class="grid grid-cols-2 gap-3 hidden">
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block">Von</label>
+                        <input type="date" id="exportFrom" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block">Bis</label>
+                        <input type="date" id="exportTo" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="exportXLSX()" class="py-3 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-medium">📊 XLSX</button>
+                    <button onclick="exportPDF()" class="py-3 bg-red-700 hover:bg-red-600 rounded-lg text-sm font-medium">📄 PDF</button>
+                    <button onclick="exportCSV()" class="py-3 bg-blue-700 hover:bg-blue-600 rounded-lg text-sm font-medium">📋 CSV</button>
+                    <button onclick="exportJSON()" class="py-3 bg-purple-700 hover:bg-purple-600 rounded-lg text-sm font-medium">💾 JSON</button>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 space-y-4">
+                <h3 class="font-medium">📥 Daten importieren</h3>
+                <input type="file" id="importFile" accept=".json" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm" onchange="importJSON()">
+                <p class="text-xs text-gray-500">JSON-Backup importieren (Daten werden hinzugefügt)</p>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl p-4 border border-red-900 space-y-4">
+                <h3 class="font-medium text-red-400">⚠️ Gefahrenzone</h3>
+                <button onclick="clearAllData()" class="w-full py-3 bg-red-900 hover:bg-red-800 rounded-lg text-sm font-medium">🗑️ Alle Daten löschen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-backdrop">
+        <div class="bg-gray-800 rounded-2xl p-6 m-4 max-w-md w-full border border-gray-700 shadow-2xl">
+            <h3 class="text-lg font-bold mb-4">✏️ Eintrag bearbeiten</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-gray-400">Datum</label>
+                    <input type="date" id="editDate" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-gray-400">Start</label>
+                        <input type="time" id="editStart" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400">Ende</label>
+                        <input type="time" id="editEnd" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400">Projekt</label>
+                    <select id="editProject" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm"></select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400">Tätigkeit</label>
+                    <input type="text" id="editActivity" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400">Arbeitsort</label>
+                    <select id="editLocation" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                        <option value="true">🏠 Homeoffice</option>
+                        <option value="false">🏢 Büro</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="closeEditModal()" class="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm">Abbrechen</button>
+                <button onclick="saveEdit()" class="flex-1 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium">💾 Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // FIREBASE CONFIGURATION - HIER DEINE DATEN EINTRAGEN!
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "DEINE_API_KEY",
+            authDomain: "DEIN_PROJEKT.firebaseapp.com",
+            projectId: "DEIN_PROJEKT_ID",
+            storageBucket: "DEIN_PROJEKT.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abc123def456"
+        };
+        // ============================================================
+
+        // Firebase initialisieren
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        
+        // Offline-Persistenz aktivieren
+        db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+            console.log('Offline-Persistenz nicht verfügbar:', err.code);
+        });
+
+        // ==================== STATE ====================
+        let entries = [];
+        let projects = {};
+        let timerInterval = null;
+        let timerStart = null;
+        let timerSeconds = 0;
+        let isRunning = false;
+        let isHomeoffice = true;
+        let editingEntryId = null;
+        let dashboardPeriod = 'week';
+        let currentUser = null;
+        let unsubscribeEntries = null;
+        let unsubscribeProjects = null;
+        let sortOrderDescending = true; // true = neueste zuerst, false = älteste zuerst
+        
+        // Audio Context für Alarm (muss durch User-Klick aktiviert werden)
+        let audioCtx = null;
+        
+        function initAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            // iOS Safari: Context "entsperren" durch leisen Ton
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            // Stiller Ton um Audio zu aktivieren
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.value = 0.001; // Fast unhörbar
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.1);
+        }
+
+        // ==================== INITIAL PROJECTS ====================
+        const INITIAL_PROJECTS = {
+            'AFT': { name: 'AFT', color: '#3B82F6' },
+            'Daily': { name: 'Daily', color: '#10B981' },
+            'Dienstreise': { name: 'Dienstreise', color: '#F59E0B' },
+            'GPR-Sitzung': { name: 'GPR-Sitzung', color: '#EF4444' },
+            'Klausur': { name: 'Klausur', color: '#8B5CF6' },
+            'ÖPR-Sitzung': { name: 'ÖPR-Sitzung', color: '#EC4899' },
+            'DS/ITS JourFixe': { name: 'DS/ITS JourFixe', color: '#06B6D4' },
+            'JourFixe TuG': { name: 'JourFixe TuG', color: '#84CC16' },
+            'PR! Nachgefragt': { name: 'PR! Nachgefragt', color: '#F97316' },
+            'Personalversammlung': { name: 'Personalversammlung', color: '#A855F7' },
+            'Sprechstunde FM': { name: 'Sprechstunde FM', color: '#14B8A6' }
+        };
+
+        // ==================== AUTHENTICATION ====================
+        
+        // Auth State Observer
+        auth.onAuthStateChanged(user => {
+            console.log('Auth State:', user ? user.email : 'nicht angemeldet');
+            if (user) {
+                currentUser = user;
+                showApp();
+                setupRealtimeSync();
+                restoreTimerState();
+            } else {
+                currentUser = null;
+                showLogin();
+                cleanupSync();
+            }
+        });
+
+        async function signInWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            provider.setCustomParameters({ prompt: 'select_account' });
+            
+            // Immer Popup verwenden - funktioniert besser auf allen Plattformen
+            try {
+                document.getElementById('loginBtn').disabled = true;
+                document.getElementById('loginBtn').innerHTML = '⏳ Anmelden...';
+                
+                await auth.signInWithPopup(provider);
+                console.log('✅ Login erfolgreich');
+            } catch (err) {
+                console.error('Login Error:', err.code, err.message);
+                
+                document.getElementById('loginBtn').disabled = false;
+                document.getElementById('loginBtn').innerHTML = '<svg class="w-6 h-6" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Mit Google anmelden';
+                
+                if (err.code === 'auth/popup-blocked') {
+                    alert('⚠️ Popup wurde blockiert!\n\nBitte erlaube Popups für diese Seite:\n\n' +
+                          '📱 iPhone/iPad:\n' +
+                          '1. Einstellungen → Safari\n' +
+                          '2. "Popups blockieren" deaktivieren\n' +
+                          '3. Seite neu laden und erneut versuchen');
+                } else if (err.code === 'auth/popup-closed-by-user') {
+                    // Benutzer hat Popup geschlossen - nichts tun
+                } else if (err.code === 'auth/cancelled-popup-request') {
+                    // Ignorieren
+                } else if (err.code === 'auth/network-request-failed') {
+                    alert('❌ Netzwerkfehler. Bitte Internetverbindung prüfen.');
+                } else {
+                    alert('❌ Login fehlgeschlagen: ' + err.message);
+                }
+            }
+        }
+
+        function signOut() {
+            auth.signOut();
+            hideUserMenu();
+        }
+
+        function showLogin() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('app').classList.add('hidden');
+        }
+
+        function showApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+            
+            // User Info anzeigen
+            document.getElementById('userPhoto').src = currentUser.photoURL || '';
+            document.getElementById('userName').textContent = currentUser.displayName || 'User';
+            document.getElementById('userEmail').textContent = currentUser.email || '';
+            
+            initUI();
+        }
+
+        function showUserMenu() {
+            document.getElementById('userMenu').classList.toggle('hidden');
+        }
+
+        function hideUserMenu() {
+            document.getElementById('userMenu').classList.add('hidden');
+        }
+
+        // Click outside to close menu
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#userAvatar') && !e.target.closest('#userMenu')) {
+                hideUserMenu();
+            }
+        });
+
+        // ==================== FIRESTORE SYNC ====================
+        function setupRealtimeSync() {
+            if (!currentUser) return;
+            
+            setSyncStatus('syncing');
+            
+            // Entries listener
+            unsubscribeEntries = db.collection('users').doc(currentUser.uid)
+                .collection('entries')
+                .orderBy('datum', 'desc')
+                .onSnapshot(snapshot => {
+                    entries = [];
+                    snapshot.forEach(doc => {
+                        entries.push({ id: doc.id, ...doc.data() });
+                    });
+                    updateTodayView();
+                    if (document.getElementById('content-entries').classList.contains('hidden') === false) {
+                        filterEntries();
+                    }
+                    if (document.getElementById('content-dashboard').classList.contains('hidden') === false) {
+                        updateDashboard();
+                    }
+                    setSyncStatus('synced');
+                }, err => {
+                    console.error('Entries sync error:', err);
+                    setSyncStatus('error');
+                });
+            
+            // Projects listener
+            unsubscribeProjects = db.collection('users').doc(currentUser.uid)
+                .collection('projects')
+                .onSnapshot(snapshot => {
+                    if (snapshot.empty) {
+                        // Initialize with default projects
+                        initializeProjects();
+                    } else {
+                        projects = {};
+                        snapshot.forEach(doc => {
+                            projects[doc.id] = doc.data();
+                        });
+                        updateProjectSelects();
+                        if (document.getElementById('content-projects').classList.contains('hidden') === false) {
+                            renderProjects();
+                        }
+                    }
+                }, err => {
+                    console.error('Projects sync error:', err);
+                });
+        }
+
+        function cleanupSync() {
+            if (unsubscribeEntries) unsubscribeEntries();
+            if (unsubscribeProjects) unsubscribeProjects();
+        }
+
+        async function initializeProjects() {
+            const batch = db.batch();
+            Object.entries(INITIAL_PROJECTS).forEach(([key, value]) => {
+                const ref = db.collection('users').doc(currentUser.uid).collection('projects').doc(key);
+                batch.set(ref, value);
+            });
+            await batch.commit();
+        }
+
+        function setSyncStatus(status) {
+            const el = document.getElementById('syncStatus');
+            el.classList.remove('syncing');
+            
+            switch(status) {
+                case 'syncing':
+                    el.innerHTML = '🔄 Sync...';
+                    el.className = 'sync-indicator syncing text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full';
+                    break;
+                case 'synced':
+                    el.innerHTML = '☁️ Sync';
+                    el.className = 'sync-indicator text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full';
+                    break;
+                case 'error':
+                    el.innerHTML = '⚠️ Offline';
+                    el.className = 'sync-indicator text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full';
+                    break;
+            }
+        }
+
+        // ==================== FIRESTORE OPERATIONS ====================
+        async function addEntry(entry) {
+            if (!currentUser) return;
+            setSyncStatus('syncing');
+            try {
+                await db.collection('users').doc(currentUser.uid).collection('entries').add(entry);
+                setSyncStatus('synced');
+            } catch (err) {
+                console.error('Add entry error:', err);
+                setSyncStatus('error');
+            }
+        }
+
+        async function updateEntry(id, data) {
+            if (!currentUser) return;
+            setSyncStatus('syncing');
+            try {
+                await db.collection('users').doc(currentUser.uid).collection('entries').doc(id).update(data);
+                setSyncStatus('synced');
+            } catch (err) {
+                console.error('Update entry error:', err);
+                setSyncStatus('error');
+            }
+        }
+
+        async function deleteEntryFromDB(id) {
+            if (!currentUser) return;
+            setSyncStatus('syncing');
+            try {
+                await db.collection('users').doc(currentUser.uid).collection('entries').doc(id).delete();
+                setSyncStatus('synced');
+            } catch (err) {
+                console.error('Delete entry error:', err);
+                setSyncStatus('error');
+            }
+        }
+
+        async function addProjectToDB(name, data) {
+            if (!currentUser) return;
+            try {
+                await db.collection('users').doc(currentUser.uid).collection('projects').doc(name).set(data);
+            } catch (err) {
+                console.error('Add project error:', err);
+            }
+        }
+
+        async function deleteProjectFromDB(name) {
+            if (!currentUser) return;
+            try {
+                await db.collection('users').doc(currentUser.uid).collection('projects').doc(name).delete();
+            } catch (err) {
+                console.error('Delete project error:', err);
+            }
+        }
+
+        async function renameProjectInDB(oldName, newName) {
+            if (!currentUser) return;
+            try {
+                const oldData = projects[oldName];
+                await db.collection('users').doc(currentUser.uid).collection('projects').doc(newName).set({
+                    ...oldData,
+                    name: newName
+                });
+                await db.collection('users').doc(currentUser.uid).collection('projects').doc(oldName).delete();
+                
+                // Update all entries with old project name
+                const batch = db.batch();
+                entries.filter(e => e.projekt === oldName).forEach(e => {
+                    const ref = db.collection('users').doc(currentUser.uid).collection('entries').doc(e.id);
+                    batch.update(ref, { projekt: newName });
+                });
+                await batch.commit();
+            } catch (err) {
+                console.error('Rename project error:', err);
+            }
+        }
+
+        // ==================== UI INIT ====================
+        function initUI() {
+            document.getElementById('manualDate').value = getToday();
+            updateProjectSelects();
+            
+            // Sortierreihenfolge aus localStorage laden
+            const savedSortOrder = localStorage.getItem('zeiterfassung_sortOrder');
+            if (savedSortOrder === 'asc') {
+                sortOrderDescending = false;
+                document.getElementById('btnSortOrder').innerHTML = '⬆️';
+                document.getElementById('btnSortOrder').title = 'Sortierung: Älteste zuerst';
+            }
+            
+            updateTodayView();
+        }
+
+        // ==================== TABS ====================
+        function showTab(tabName) {
+            ['timer', 'entries', 'projects', 'dashboard', 'export'].forEach(t => {
+                document.getElementById(`content-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('tab-active');
+                document.getElementById(`tab-${t}`).classList.add('text-gray-400');
+            });
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabName}`).classList.add('tab-active');
+            document.getElementById(`tab-${tabName}`).classList.remove('text-gray-400');
+
+            if (tabName === 'entries') filterEntries();
+            if (tabName === 'projects') renderProjects();
+            if (tabName === 'dashboard') updateDashboard();
+        }
+
+        // ==================== TIMER ====================
+        function toggleTimer() {
+            if (isRunning) {
+                stopTimer();
+            } else {
+                startTimer();
+            }
+        }
+
+        function startTimer() {
+            const useCountdown = document.getElementById('useCountdown').checked;
+            
+            // Audio für Alarm vorbereiten (muss bei User-Klick passieren!)
+            initAudioContext();
+            
+            // Countdown-Dauer merken
+            const countdownMinutes = parseInt(document.getElementById('countdownMinutes').value) || 60;
+            
+            if (useCountdown) {
+                timerSeconds = countdownMinutes * 60;
+            } else {
+                timerSeconds = 0;
+            }
+            
+            timerStart = new Date();
+            isRunning = true;
+            
+            document.getElementById('btnStartStop').innerHTML = '⏸️ Stop';
+            document.getElementById('btnStartStop').classList.remove('bg-green-600', 'hover:bg-green-500');
+            document.getElementById('btnStartStop').classList.add('bg-red-600', 'hover:bg-red-500');
+            document.getElementById('timerDisplay').classList.add('timer-active');
+            document.getElementById('timerStatus').textContent = 'Timer läuft...';
+            
+            saveTimerState();
+            
+            // Timer basiert auf echter Startzeit, nicht auf Sekunden-Zählung
+            timerInterval = setInterval(() => {
+                const now = new Date();
+                const elapsedSeconds = Math.floor((now - timerStart) / 1000);
+                
+                if (useCountdown) {
+                    timerSeconds = Math.max(0, (countdownMinutes * 60) - elapsedSeconds);
+                    if (timerSeconds <= 0) {
+                        timerSeconds = 0;
+                        stopTimer();
+                        notifyTimerEnd();
+                    }
+                } else {
+                    timerSeconds = elapsedSeconds;
+                }
+                updateTimerDisplay();
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            
+            document.getElementById('btnStartStop').innerHTML = '▶️ Start';
+            document.getElementById('btnStartStop').classList.remove('bg-red-600', 'hover:bg-red-500');
+            document.getElementById('btnStartStop').classList.add('bg-green-600', 'hover:bg-green-500');
+            document.getElementById('timerDisplay').classList.remove('timer-active');
+            document.getElementById('timerStatus').textContent = 'Timer gestoppt';
+            
+            if (timerStart && timerSeconds > 60) {
+                saveTimerEntry();
+            }
+            
+            clearTimerState();
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            timerSeconds = 0;
+            timerStart = null;
+            
+            document.getElementById('btnStartStop').innerHTML = '▶️ Start';
+            document.getElementById('btnStartStop').classList.remove('bg-red-600', 'hover:bg-red-500');
+            document.getElementById('btnStartStop').classList.add('bg-green-600', 'hover:bg-green-500');
+            document.getElementById('timerDisplay').classList.remove('timer-active');
+            document.getElementById('timerStatus').textContent = 'Bereit zum Starten';
+            updateTimerDisplay();
+            clearTimerState();
+        }
+
+        function updateTimerDisplay() {
+            const hours = Math.floor(timerSeconds / 3600);
+            const minutes = Math.floor((timerSeconds % 3600) / 60);
+            const seconds = timerSeconds % 60;
+            document.getElementById('timerValue').textContent = 
+                `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function toggleCountdownMode() {
+            const checked = document.getElementById('useCountdown').checked;
+            document.getElementById('countdownMinutes').disabled = !checked;
+        }
+
+        function saveTimerEntry() {
+            const endTime = new Date();
+            const projektSelect = document.getElementById('currentProject');
+            const activity = document.getElementById('currentActivity').value;
+            
+            const entry = {
+                datum: timerStart.toISOString().split('T')[0],
+                start: timerStart.toTimeString().slice(0, 5),
+                ende: endTime.toTimeString().slice(0, 5),
+                projekt: projektSelect.value,
+                taetigkeit: activity,
+                homeoffice: isHomeoffice,
+                stunden: calculateHours(timerStart.toTimeString().slice(0, 5), endTime.toTimeString().slice(0, 5)),
+                pause: 0,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            if (checkTimeConflict(entry)) {
+                if (!confirm('⚠️ Zeitkonflikt erkannt! Trotzdem speichern?')) {
+                    return;
+                }
+            }
+            
+            addEntry(entry);
+            timerStart = null;
+            showToast('✅ Zeiteintrag gespeichert!');
+        }
+
+        function saveTimerState() {
+            localStorage.setItem('zeiterfassung_timer', JSON.stringify({
+                timerStart: timerStart?.toISOString(),
+                isRunning,
+                isCountdown: document.getElementById('useCountdown').checked,
+                countdownMinutes: document.getElementById('countdownMinutes').value,
+                project: document.getElementById('currentProject').value,
+                activity: document.getElementById('currentActivity').value,
+                homeoffice: isHomeoffice
+            }));
+        }
+
+        function clearTimerState() {
+            localStorage.removeItem('zeiterfassung_timer');
+        }
+
+        function restoreTimerState() {
+            const saved = localStorage.getItem('zeiterfassung_timer');
+            if (!saved) return;
+            
+            const state = JSON.parse(saved);
+            if (!state.isRunning || !state.timerStart) return;
+            
+            const startTime = new Date(state.timerStart);
+            const elapsed = Math.floor((Date.now() - startTime.getTime()) / 1000);
+            const countdownMinutes = parseInt(state.countdownMinutes) || 60;
+            
+            timerStart = startTime;
+            document.getElementById('currentProject').value = state.project || '';
+            document.getElementById('currentActivity').value = state.activity || '';
+            isHomeoffice = state.homeoffice;
+            updateLocationButtons();
+            
+            if (state.isCountdown) {
+                document.getElementById('useCountdown').checked = true;
+                document.getElementById('countdownMinutes').value = countdownMinutes;
+                document.getElementById('countdownMinutes').disabled = false;
+                timerSeconds = Math.max(0, (countdownMinutes * 60) - elapsed);
+                
+                // Countdown abgelaufen während App geschlossen war?
+                if (timerSeconds <= 0) {
+                    timerSeconds = 0;
+                    clearTimerState();
+                    notifyTimerEnd();
+                    return;
+                }
+            } else {
+                timerSeconds = elapsed;
+            }
+            
+            isRunning = true;
+            document.getElementById('btnStartStop').innerHTML = '⏸️ Stop';
+            document.getElementById('btnStartStop').classList.remove('bg-green-600', 'hover:bg-green-500');
+            document.getElementById('btnStartStop').classList.add('bg-red-600', 'hover:bg-red-500');
+            document.getElementById('timerDisplay').classList.add('timer-active');
+            document.getElementById('timerStatus').textContent = '✅ Timer wiederhergestellt!';
+            showToast(`⏱️ Timer wiederhergestellt! Läuft seit ${formatTimerDuration(elapsed)}`);
+            
+            // Audio vorbereiten für möglichen Alarm
+            initAudioContext();
+            
+            function formatTimerDuration(seconds) {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                if (h > 0) return `${h}h ${m}min`;
+                return `${m} Minuten`;
+            }
+            
+            updateTimerDisplay();
+            
+            // Timer basiert auf echter Startzeit
+            timerInterval = setInterval(() => {
+                const now = new Date();
+                const elapsedNow = Math.floor((now - timerStart) / 1000);
+                
+                if (state.isCountdown) {
+                    timerSeconds = Math.max(0, (countdownMinutes * 60) - elapsedNow);
+                    if (timerSeconds <= 0) {
+                        timerSeconds = 0;
+                        stopTimer();
+                        notifyTimerEnd();
+                    }
+                } else {
+                    timerSeconds = elapsedNow;
+                }
+                updateTimerDisplay();
+            }, 1000);
+        }
+
+        function notifyTimerEnd() {
+            // 1. Alarm-Sound abspielen
+            playAlarmSound();
+            
+            // 2. Vibration auf Mobilgeräten (3x kurz)
+            if ('vibrate' in navigator) {
+                navigator.vibrate([200, 100, 200, 100, 200]);
+            }
+            
+            // 3. Browser-Benachrichtigung
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('⏰ Countdown beendet!', { 
+                    body: 'Deine Zeit ist abgelaufen.',
+                    icon: 'icon-192.png',
+                    tag: 'timer-alarm',
+                    requireInteraction: true
+                });
+            }
+            
+            // 4. Visuelles Feedback - Bildschirm blinkt
+            showAlarmModal();
+        }
+        
+        function playAlarmSound() {
+            // Globalen Audio Context verwenden (wurde beim Timer-Start aktiviert)
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                // Context reaktivieren falls suspended
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                
+                // Alarm-Melodie: 3 aufsteigende Töne, 2x wiederholt
+                const playToneSequence = (startTime, baseFreq) => {
+                    [0, 0.2, 0.4].forEach((delay, i) => {
+                        const oscillator = audioCtx.createOscillator();
+                        const gainNode = audioCtx.createGain();
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioCtx.destination);
+                        
+                        // Aufsteigende Töne
+                        oscillator.frequency.value = baseFreq + (i * 100);
+                        oscillator.type = 'sine';
+                        
+                        const t = startTime + delay;
+                        gainNode.gain.setValueAtTime(0.4, t);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, t + 0.18);
+                        
+                        oscillator.start(t);
+                        oscillator.stop(t + 0.2);
+                    });
+                };
+                
+                const now = audioCtx.currentTime;
+                playToneSequence(now, 660);        // Erste Sequenz
+                playToneSequence(now + 0.8, 880);  // Zweite Sequenz (höher)
+                playToneSequence(now + 1.6, 660);  // Dritte Sequenz
+                playToneSequence(now + 2.4, 1047); // Finale (noch höher)
+                
+            } catch (e) {
+                console.log('Audio Fehler:', e);
+            }
+        }
+        
+        function showAlarmModal() {
+            // Alarm-Modal erstellen
+            const modal = document.createElement('div');
+            modal.id = 'alarmModal';
+            modal.className = 'fixed inset-0 z-50 flex items-center justify-center';
+            modal.innerHTML = `
+                <div class="absolute inset-0 bg-red-900/80 alarm-flash"></div>
+                <div class="relative bg-gray-800 rounded-2xl p-8 m-4 max-w-sm w-full border-4 border-red-500 shadow-2xl text-center z-10">
+                    <div class="text-6xl mb-4 animate-bounce">⏰</div>
+                    <h2 class="text-2xl font-bold text-red-400 mb-2">Zeit abgelaufen!</h2>
+                    <p class="text-gray-300 mb-6">Dein Countdown ist beendet.</p>
+                    <button onclick="closeAlarmModal()" class="w-full py-4 bg-red-600 hover:bg-red-500 rounded-xl text-lg font-bold transition-all">
+                        OK, verstanden
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Blink-Animation per CSS
+            const style = document.createElement('style');
+            style.id = 'alarmStyle';
+            style.textContent = `
+                @keyframes alarm-flash {
+                    0%, 100% { opacity: 0.8; }
+                    50% { opacity: 0.5; }
+                }
+                .alarm-flash {
+                    animation: alarm-flash 0.5s ease-in-out infinite;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        function closeAlarmModal() {
+            const modal = document.getElementById('alarmModal');
+            const style = document.getElementById('alarmStyle');
+            if (modal) modal.remove();
+            if (style) style.remove();
+        }
+        
+        function testAlarm() {
+            // Audio Context initialisieren (durch User-Klick)
+            initAudioContext();
+            // Kurze Verzögerung damit Context bereit ist
+            setTimeout(() => {
+                playAlarmSound();
+                showToast('🔔 Alarm-Test!');
+            }, 100);
+        }
+
+        // ==================== LOCATION ====================
+        function setLocation(homeoffice) {
+            isHomeoffice = homeoffice;
+            updateLocationButtons();
+        }
+
+        function updateLocationButtons() {
+            const btnHO = document.getElementById('btn-ho');
+            const btnOffice = document.getElementById('btn-office');
+            
+            if (isHomeoffice) {
+                btnHO.classList.add('bg-blue-600');
+                btnHO.classList.remove('bg-gray-700');
+                btnOffice.classList.add('bg-gray-700');
+                btnOffice.classList.remove('bg-blue-600');
+            } else {
+                btnOffice.classList.add('bg-blue-600');
+                btnOffice.classList.remove('bg-gray-700');
+                btnHO.classList.add('bg-gray-700');
+                btnHO.classList.remove('bg-blue-600');
+            }
+        }
+
+        // ==================== ENTRIES ====================
+        function addManualEntry() {
+            const datum = document.getElementById('manualDate').value;
+            const start = document.getElementById('manualStart').value;
+            const ende = document.getElementById('manualEnd').value;
+            const projekt = document.getElementById('currentProject').value;
+            const activity = document.getElementById('currentActivity').value;
+            
+            if (!datum || !start || !ende) {
+                alert('Bitte Datum, Start und Ende eingeben!');
+                return;
+            }
+            
+            const entry = {
+                datum,
+                start,
+                ende,
+                projekt,
+                taetigkeit: activity,
+                homeoffice: isHomeoffice,
+                stunden: calculateHours(start, ende),
+                pause: 0,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            if (checkTimeConflict(entry)) {
+                if (!confirm('⚠️ Zeitkonflikt erkannt! Trotzdem speichern?')) {
+                    return;
+                }
+            }
+            
+            addEntry(entry);
+            showToast('✅ Eintrag hinzugefügt!');
+            
+            document.getElementById('manualStart').value = '';
+            document.getElementById('manualEnd').value = '';
+        }
+
+        function checkTimeConflict(newEntry) {
+            const sameDayEntries = entries.filter(e => e.datum === newEntry.datum && e.id !== newEntry.id);
+            
+            const newStart = timeToMinutes(newEntry.start);
+            const newEnd = timeToMinutes(newEntry.ende);
+            
+            for (const entry of sameDayEntries) {
+                const existStart = timeToMinutes(entry.start);
+                const existEnd = timeToMinutes(entry.ende);
+                
+                if (newStart < existEnd && newEnd > existStart) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function timeToMinutes(time) {
+            if (!time) return 0;
+            const [h, m] = time.split(':').map(Number);
+            return h * 60 + m;
+        }
+
+        function calculateHours(start, ende) {
+            const startMin = timeToMinutes(start);
+            const endMin = timeToMinutes(ende);
+            return Math.round((endMin - startMin) / 60 * 100) / 100;
+        }
+
+        function updateTodayView() {
+            const today = getToday();
+            const todayEntries = entries.filter(e => e.datum === today).sort((a, b) => {
+                if (sortOrderDescending) {
+                    return (b.start || '').localeCompare(a.start || '');
+                } else {
+                    return (a.start || '').localeCompare(b.start || '');
+                }
+            });
+            
+            const container = document.getElementById('todayEntries');
+            
+            if (todayEntries.length === 0) {
+                container.innerHTML = '<div class="p-4 text-gray-500 text-center text-sm">Keine Einträge heute</div>';
+            } else {
+                container.innerHTML = todayEntries.map(e => `
+                    <div class="flex items-center gap-3 p-3 border-b border-gray-700 hover:bg-gray-700/50">
+                        <div class="w-1 h-10 rounded" style="background: ${projects[e.projekt]?.color || '#6B7280'}"></div>
+                        <div class="flex-1">
+                            <div class="text-sm font-medium">${e.start} - ${e.ende}</div>
+                            <div class="text-xs text-gray-400">${e.projekt || 'Allgemein'}${e.taetigkeit ? ' • ' + e.taetigkeit : ''}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-mono">${(e.stunden || 0).toFixed(2)}h</div>
+                            <div class="text-xs">${e.homeoffice ? '🏠' : '🏢'}</div>
+                        </div>
+                        <button onclick="editEntry('${e.id}')" class="p-2 hover:bg-gray-600 rounded">✏️</button>
+                        <button onclick="deleteEntry('${e.id}')" class="p-2 hover:bg-red-900 rounded">🗑️</button>
+                    </div>
+                `).join('');
+            }
+            
+            const totalHours = todayEntries.reduce((sum, e) => sum + (e.stunden || 0), 0);
+            document.getElementById('todayTotal').textContent = totalHours.toFixed(2) + ' h';
+        }
+
+        function toggleSortOrder() {
+            sortOrderDescending = !sortOrderDescending;
+            localStorage.setItem('zeiterfassung_sortOrder', sortOrderDescending ? 'desc' : 'asc');
+            
+            const btn = document.getElementById('btnSortOrder');
+            if (sortOrderDescending) {
+                btn.innerHTML = '⬇️';
+                btn.title = 'Sortierung: Neueste zuerst';
+                showToast('📅 Sortierung: Neueste zuerst');
+            } else {
+                btn.innerHTML = '⬆️';
+                btn.title = 'Sortierung: Älteste zuerst';
+                showToast('📅 Sortierung: Älteste zuerst');
+            }
+            filterEntries();
+            updateTodayView();
+        }
+
+        function filterEntries() {
+            const filterDate = document.getElementById('filterDate').value;
+            const filterProject = document.getElementById('filterProject').value;
+            
+            let filtered = [...entries];
+            
+            if (filterDate) {
+                filtered = filtered.filter(e => e.datum === filterDate);
+            }
+            
+            if (filterProject) {
+                filtered = filtered.filter(e => e.projekt === filterProject);
+            }
+            
+            filtered.sort((a, b) => {
+                if (sortOrderDescending) {
+                    // Absteigend: Neueste zuerst
+                    if (a.datum !== b.datum) return b.datum.localeCompare(a.datum);
+                    return (b.start || '').localeCompare(a.start || '');
+                } else {
+                    // Aufsteigend: Älteste zuerst
+                    if (a.datum !== b.datum) return a.datum.localeCompare(b.datum);
+                    return (a.start || '').localeCompare(b.start || '');
+                }
+            });
+            
+            const container = document.getElementById('entriesList');
+            
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="p-8 text-gray-500 text-center">Keine Einträge gefunden</div>';
+            } else {
+                container.innerHTML = filtered.slice(0, 100).map(e => `
+                    <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 flex items-center gap-3">
+                        <div class="w-1 h-12 rounded" style="background: ${projects[e.projekt]?.color || '#6B7280'}"></div>
+                        <div class="flex-1">
+                            <div class="text-sm font-medium">${formatDate(e.datum)}</div>
+                            <div class="text-xs text-gray-400">${e.start} - ${e.ende} • ${e.projekt || 'Allgemein'}</div>
+                            ${e.taetigkeit ? `<div class="text-xs text-gray-500">${e.taetigkeit}</div>` : ''}
+                        </div>
+                        <div class="text-right">
+                            <div class="font-mono">${(e.stunden || 0).toFixed(2)}h</div>
+                            <div class="text-xs">${e.homeoffice ? '🏠' : '🏢'}</div>
+                        </div>
+                        <button onclick="editEntry('${e.id}')" class="p-2 hover:bg-gray-600 rounded">✏️</button>
+                        <button onclick="deleteEntry('${e.id}')" class="p-2 hover:bg-red-900 rounded">🗑️</button>
+                    </div>
+                `).join('');
+            }
+            
+            const totalHours = filtered.reduce((sum, e) => sum + (e.stunden || 0), 0);
+            document.getElementById('entriesStats').textContent = `${filtered.length} Einträge • ${totalHours.toFixed(2)} Stunden`;
+        }
+
+        function editEntry(id) {
+            const entry = entries.find(e => e.id === id);
+            if (!entry) return;
+            
+            editingEntryId = id;
+            
+            document.getElementById('editDate').value = entry.datum;
+            document.getElementById('editStart').value = entry.start;
+            document.getElementById('editEnd').value = entry.ende;
+            document.getElementById('editActivity').value = entry.taetigkeit || '';
+            document.getElementById('editLocation').value = String(entry.homeoffice);
+            
+            const select = document.getElementById('editProject');
+            select.innerHTML = '<option value="">-- Kein Projekt --</option>' + 
+                Object.keys(projects).map(p => `<option value="${p}" ${entry.projekt === p ? 'selected' : ''}>${p}</option>`).join('');
+            
+            document.getElementById('editModal').classList.remove('hidden');
+            document.getElementById('editModal').classList.add('flex');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+            document.getElementById('editModal').classList.remove('flex');
+            editingEntryId = null;
+        }
+
+        function saveEdit() {
+            if (!editingEntryId) return;
+            
+            const updatedData = {
+                datum: document.getElementById('editDate').value,
+                start: document.getElementById('editStart').value,
+                ende: document.getElementById('editEnd').value,
+                projekt: document.getElementById('editProject').value,
+                taetigkeit: document.getElementById('editActivity').value,
+                homeoffice: document.getElementById('editLocation').value === 'true',
+                stunden: calculateHours(document.getElementById('editStart').value, document.getElementById('editEnd').value)
+            };
+            
+            // Check conflict
+            const tempEntry = { ...updatedData, id: editingEntryId };
+            if (checkTimeConflict(tempEntry)) {
+                if (!confirm('⚠️ Zeitkonflikt erkannt! Trotzdem speichern?')) {
+                    return;
+                }
+            }
+            
+            updateEntry(editingEntryId, updatedData);
+            closeEditModal();
+            showToast('✅ Änderungen gespeichert!');
+        }
+
+        function deleteEntry(id) {
+            if (!confirm('Eintrag wirklich löschen?')) return;
+            deleteEntryFromDB(id);
+            showToast('🗑️ Eintrag gelöscht');
+        }
+
+        // ==================== PROJECTS ====================
+        function updateProjectSelects() {
+            const projectOptions = '<option value="">-- Kein Projekt --</option>' + 
+                Object.keys(projects).sort().map(p => `<option value="${p}">${p}</option>`).join('');
+            
+            document.getElementById('currentProject').innerHTML = projectOptions;
+            document.getElementById('filterProject').innerHTML = '<option value="">Alle Projekte</option>' + 
+                Object.keys(projects).sort().map(p => `<option value="${p}">${p}</option>`).join('');
+        }
+
+        function renderProjects() {
+            const container = document.getElementById('projectsList');
+            const projectKeys = Object.keys(projects).sort();
+            
+            container.innerHTML = projectKeys.map(p => {
+                const projectHours = entries.filter(e => e.projekt === p).reduce((sum, e) => sum + (e.stunden || 0), 0);
+                return `
+                    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 flex items-center gap-3">
+                        <div class="w-4 h-4 rounded" style="background: ${projects[p].color}"></div>
+                        <div class="flex-1">
+                            <div class="font-medium">${p}</div>
+                            <div class="text-xs text-gray-400">${projectHours.toFixed(2)} Stunden gesamt</div>
+                        </div>
+                        <button onclick="editProject('${p}')" class="p-2 hover:bg-gray-600 rounded">✏️</button>
+                        <button onclick="deleteProject('${p}')" class="p-2 hover:bg-red-900 rounded">🗑️</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addProject() {
+            const name = document.getElementById('newProjectName').value.trim();
+            const color = document.getElementById('newProjectColor').value;
+            
+            if (!name) {
+                alert('Bitte Projektnamen eingeben!');
+                return;
+            }
+            
+            if (projects[name]) {
+                alert('Projekt existiert bereits!');
+                return;
+            }
+            
+            addProjectToDB(name, { name, color });
+            document.getElementById('newProjectName').value = '';
+            showToast('✅ Projekt erstellt!');
+        }
+
+        function editProject(oldName) {
+            const newName = prompt('Neuer Projektname:', oldName);
+            if (!newName || newName === oldName) return;
+            
+            if (projects[newName]) {
+                alert('Projekt existiert bereits!');
+                return;
+            }
+            
+            renameProjectInDB(oldName, newName);
+            showToast('✅ Projekt umbenannt!');
+        }
+
+        function deleteProject(name) {
+            const count = entries.filter(e => e.projekt === name).length;
+            if (!confirm(`Projekt "${name}" löschen? (${count} Einträge werden nicht gelöscht)`)) return;
+            
+            deleteProjectFromDB(name);
+            showToast('🗑️ Projekt gelöscht');
+        }
+
+        // ==================== DASHBOARD ====================
+        function setDashboardPeriod(period) {
+            dashboardPeriod = period;
+            ['week', 'month', 'year', 'all', 'custom'].forEach(p => {
+                const btn = document.getElementById(`dash-${p}`);
+                if (btn) {
+                    btn.classList.toggle('bg-blue-600', p === period);
+                    btn.classList.toggle('bg-gray-700', p !== period);
+                }
+            });
+            
+            const dateRange = document.getElementById('dashboardDateRange');
+            if (period === 'custom') {
+                dateRange.classList.remove('hidden');
+                // Standardwerte setzen falls leer
+                const today = new Date();
+                const monthAgo = new Date(today);
+                monthAgo.setMonth(monthAgo.getMonth() - 1);
+                
+                const fromInput = document.getElementById('dashFrom');
+                const toInput = document.getElementById('dashTo');
+                
+                if (!fromInput.value) {
+                    fromInput.value = monthAgo.toISOString().split('T')[0];
+                }
+                if (!toInput.value) {
+                    toInput.value = today.toISOString().split('T')[0];
+                }
+                
+                // Kurz warten damit die Werte gesetzt sind, dann Dashboard aktualisieren
+                setTimeout(() => updateDashboard(), 50);
+            } else {
+                dateRange.classList.add('hidden');
+                updateDashboard();
+            }
+        }
+
+        function updateDashboard() {
+            const filtered = getFilteredEntries(dashboardPeriod);
+            
+            const totalHours = filtered.reduce((sum, e) => sum + (e.stunden || 0), 0);
+            const uniqueDays = [...new Set(filtered.map(e => e.datum))].length;
+            const avgPerDay = uniqueDays > 0 ? totalHours / uniqueDays : 0;
+            
+            document.getElementById('statTotalHours').textContent = totalHours.toFixed(1);
+            document.getElementById('statAvgPerDay').textContent = avgPerDay.toFixed(1);
+            document.getElementById('statWorkDays').textContent = uniqueDays;
+            document.getElementById('statEntries').textContent = filtered.length;
+            
+            const hoHours = filtered.filter(e => e.homeoffice).reduce((sum, e) => sum + (e.stunden || 0), 0);
+            const officeHours = filtered.filter(e => !e.homeoffice).reduce((sum, e) => sum + (e.stunden || 0), 0);
+            const total = hoHours + officeHours;
+            
+            const hoPct = total > 0 ? (hoHours / total * 100) : 50;
+            const officePct = total > 0 ? (officeHours / total * 100) : 50;
+            
+            document.getElementById('statHomeoffice').textContent = hoPct.toFixed(0) + '%';
+            document.getElementById('statOffice').textContent = officePct.toFixed(0) + '%';
+            document.getElementById('hoBar').style.width = hoPct + '%';
+            document.getElementById('officeBar').style.width = officePct + '%';
+            
+            const projectHours = {};
+            filtered.forEach(e => {
+                const p = e.projekt || 'Allgemein';
+                projectHours[p] = (projectHours[p] || 0) + (e.stunden || 0);
+            });
+            
+            const sortedProjects = Object.entries(projectHours).sort((a, b) => b[1] - a[1]);
+            const maxHours = sortedProjects.length > 0 ? sortedProjects[0][1] : 1;
+            
+            document.getElementById('projectStats').innerHTML = sortedProjects.map(([name, hours]) => `
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded" style="background: ${projects[name]?.color || '#6B7280'}"></div>
+                    <div class="flex-1 text-sm">${name}</div>
+                    <div class="w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full" style="width: ${(hours/maxHours*100)}%; background: ${projects[name]?.color || '#6B7280'}"></div>
+                    </div>
+                    <div class="text-sm font-mono w-16 text-right">${hours.toFixed(1)}h</div>
+                </div>
+            `).join('');
+        }
+
+        function getFilteredEntries(period) {
+            const today = new Date();
+            today.setHours(23, 59, 59, 999); // Ende des Tages
+            
+            switch(period) {
+                case 'week':
+                    const weekStart = new Date(today);
+                    weekStart.setDate(today.getDate() - today.getDay() + 1);
+                    weekStart.setHours(0, 0, 0, 0);
+                    return entries.filter(e => e.datum && new Date(e.datum) >= weekStart);
+                case 'month':
+                    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                    return entries.filter(e => e.datum && new Date(e.datum) >= monthStart);
+                case 'year':
+                    const yearStart = new Date(today.getFullYear(), 0, 1);
+                    return entries.filter(e => e.datum && new Date(e.datum) >= yearStart);
+                case 'custom':
+                    const fromEl = document.getElementById('dashFrom');
+                    const toEl = document.getElementById('dashTo');
+                    const from = fromEl ? fromEl.value : '';
+                    const to = toEl ? toEl.value : '';
+                    console.log('Custom Filter:', from, 'bis', to);
+                    if (from && to) {
+                        return entries.filter(e => e.datum && e.datum >= from && e.datum <= to);
+                    }
+                    console.log('Keine Datumsfilter gesetzt, zeige alle');
+                    return entries;
+                default:
+                    return entries;
+            }
+        }
+
+        // ==================== EXPORT ====================
+        function toggleCustomDates() {
+            const period = document.getElementById('exportPeriod').value;
+            const customRange = document.getElementById('customDateRange');
+            
+            if (period === 'custom') {
+                customRange.classList.remove('hidden');
+                // Standardwerte setzen: Letzter Monat
+                const today = new Date();
+                const monthAgo = new Date(today);
+                monthAgo.setMonth(monthAgo.getMonth() - 1);
+                
+                if (!document.getElementById('exportFrom').value) {
+                    document.getElementById('exportFrom').value = monthAgo.toISOString().split('T')[0];
+                }
+                if (!document.getElementById('exportTo').value) {
+                    document.getElementById('exportTo').value = today.toISOString().split('T')[0];
+                }
+            } else {
+                customRange.classList.add('hidden');
+            }
+        }
+
+        function getExportEntries() {
+            const period = document.getElementById('exportPeriod').value;
+            const today = new Date();
+            
+            let filtered = [...entries];
+            
+            switch(period) {
+                case 'today':
+                    filtered = entries.filter(e => e.datum === getToday());
+                    break;
+                case 'week':
+                    const weekStart = new Date(today);
+                    weekStart.setDate(today.getDate() - today.getDay() + 1);
+                    filtered = entries.filter(e => new Date(e.datum) >= weekStart);
+                    break;
+                case 'month':
+                    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                    filtered = entries.filter(e => new Date(e.datum) >= monthStart);
+                    break;
+                case 'year':
+                    const yearStart = new Date(today.getFullYear(), 0, 1);
+                    filtered = entries.filter(e => new Date(e.datum) >= yearStart);
+                    break;
+                case 'custom':
+                    const from = document.getElementById('exportFrom').value;
+                    const to = document.getElementById('exportTo').value;
+                    if (from && to) {
+                        filtered = entries.filter(e => e.datum >= from && e.datum <= to);
+                    } else {
+                        alert('Bitte Von- und Bis-Datum auswählen!');
+                        return [];
+                    }
+                    break;
+            }
+            
+            return filtered.sort((a, b) => {
+                if (a.datum !== b.datum) return a.datum.localeCompare(b.datum);
+                return (a.start || '').localeCompare(b.start || '');
+            });
+        }
+
+        function exportXLSX() {
+            const data = getExportEntries();
+            if (data.length === 0) { alert('Keine Daten zum Exportieren'); return; }
+            
+            const wsData = [['Datum', 'Projekt', 'Tätigkeit', 'Start', 'Ende', 'Stunden', 'Arbeitsort']];
+            
+            data.forEach(e => {
+                wsData.push([e.datum, e.projekt || '', e.taetigkeit || '', e.start, e.ende, e.stunden || 0, e.homeoffice ? 'Homeoffice' : 'Büro']);
+            });
+            
+            const totalHours = data.reduce((sum, e) => sum + (e.stunden || 0), 0);
+            wsData.push([]);
+            wsData.push(['Gesamt', '', '', '', '', totalHours, '']);
+            
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            ws['!cols'] = [{wch:12}, {wch:20}, {wch:25}, {wch:8}, {wch:8}, {wch:10}, {wch:12}];
+            XLSX.utils.book_append_sheet(wb, ws, 'Zeiterfassung');
+            XLSX.writeFile(wb, `Zeiterfassung_${getToday()}.xlsx`);
+        }
+
+        function exportPDF() {
+            const data = getExportEntries();
+            if (data.length === 0) { alert('Keine Daten zum Exportieren'); return; }
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            doc.setFontSize(18);
+            doc.text('Zeiterfassung', 14, 22);
+            doc.setFontSize(10);
+            doc.text(`Erstellt am: ${formatDate(getToday())}`, 14, 30);
+            
+            let y = 45;
+            doc.setFontSize(9);
+            doc.setFont(undefined, 'bold');
+            doc.text('Datum', 14, y);
+            doc.text('Projekt', 40, y);
+            doc.text('Start', 90, y);
+            doc.text('Ende', 110, y);
+            doc.text('Stunden', 130, y);
+            doc.text('Ort', 160, y);
+            
+            doc.setFont(undefined, 'normal');
+            y += 8;
+            
+            data.forEach(e => {
+                if (y > 280) { doc.addPage(); y = 20; }
+                doc.text(formatDate(e.datum), 14, y);
+                doc.text((e.projekt || '').substring(0, 20), 40, y);
+                doc.text(e.start || '', 90, y);
+                doc.text(e.ende || '', 110, y);
+                doc.text((e.stunden || 0).toFixed(2), 130, y);
+                doc.text(e.homeoffice ? 'HO' : 'Büro', 160, y);
+                y += 6;
+            });
+            
+            const totalHours = data.reduce((sum, e) => sum + (e.stunden || 0), 0);
+            y += 5;
+            doc.setFont(undefined, 'bold');
+            doc.text(`Gesamt: ${totalHours.toFixed(2)} Stunden`, 14, y);
+            
+            doc.save(`Zeiterfassung_${getToday()}.pdf`);
+        }
+
+        function exportCSV() {
+            const data = getExportEntries();
+            if (data.length === 0) { alert('Keine Daten zum Exportieren'); return; }
+            
+            let csv = 'Datum;Projekt;Tätigkeit;Start;Ende;Stunden;Arbeitsort\n';
+            data.forEach(e => {
+                csv += `${e.datum};${e.projekt || ''};${e.taetigkeit || ''};${e.start};${e.ende};${(e.stunden || 0).toFixed(2)};${e.homeoffice ? 'Homeoffice' : 'Büro'}\n`;
+            });
+            
+            downloadFile(csv, `Zeiterfassung_${getToday()}.csv`, 'text/csv;charset=utf-8');
+        }
+
+        function exportJSON() {
+            const data = {
+                entries: getExportEntries(),
+                projects,
+                exportDate: new Date().toISOString()
+            };
+            
+            downloadFile(JSON.stringify(data, null, 2), `Zeiterfassung_Backup_${getToday()}.json`, 'application/json');
+        }
+
+        async function importJSON() {
+            const file = document.getElementById('importFile').files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (data.entries && Array.isArray(data.entries)) {
+                        setSyncStatus('syncing');
+                        let imported = 0;
+                        
+                        for (const entry of data.entries) {
+                            // Check if entry already exists (by datum+start+ende)
+                            const exists = entries.some(e => 
+                                e.datum === entry.datum && 
+                                e.start === entry.start && 
+                                e.ende === entry.ende
+                            );
+                            
+                            if (!exists) {
+                                await db.collection('users').doc(currentUser.uid).collection('entries').add({
+                                    datum: entry.datum,
+                                    start: entry.start,
+                                    ende: entry.ende,
+                                    projekt: entry.projekt || '',
+                                    taetigkeit: entry.taetigkeit || '',
+                                    homeoffice: entry.homeoffice || false,
+                                    stunden: entry.stunden || 0,
+                                    pause: entry.pause || 0,
+                                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                                imported++;
+                            }
+                        }
+                        
+                        if (data.projects) {
+                            for (const [name, proj] of Object.entries(data.projects)) {
+                                if (!projects[name]) {
+                                    await addProjectToDB(name, proj);
+                                }
+                            }
+                        }
+                        
+                        setSyncStatus('synced');
+                        showToast(`✅ ${imported} Einträge importiert!`);
+                    }
+                } catch (err) {
+                    alert('❌ Fehler beim Import: ' + err.message);
+                    setSyncStatus('error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function downloadFile(content, filename, type) {
+            const blob = new Blob([content], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function clearAllData() {
+            if (!confirm('⚠️ ALLE Daten unwiderruflich löschen?')) return;
+            if (!confirm('Wirklich ALLE Einträge löschen? Dies kann nicht rückgängig gemacht werden!')) return;
+            
+            setSyncStatus('syncing');
+            
+            // Delete all entries
+            const entriesSnapshot = await db.collection('users').doc(currentUser.uid).collection('entries').get();
+            const batch = db.batch();
+            entriesSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+            
+            setSyncStatus('synced');
+            showToast('🗑️ Alle Daten wurden gelöscht');
+        }
+
+        // ==================== HELPERS ====================
+        function getToday() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const [y, m, d] = dateStr.split('-');
+            return `${d}.${m}.${y}`;
+        }
+
+        function showToast(message, duration = 3000) {
+            const existing = document.querySelector('.toast-notification');
+            if (existing) existing.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast-notification fixed bottom-24 left-4 right-4 bg-blue-600 text-white px-4 py-3 rounded-xl shadow-lg z-50 text-center text-sm font-medium';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        // ==================== APP LIFECYCLE ====================
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // App geht in Hintergrund - Timer-Zustand speichern
+                if (isRunning) {
+                    saveTimerState();
+                    console.log('📱 App in Hintergrund - Timer gespeichert');
+                }
+            } else {
+                // App kommt zurück - Timer aktualisieren
+                if (isRunning && timerStart) {
+                    recalculateTimer();
+                    console.log('📱 App wieder aktiv - Timer aktualisiert');
+                }
+            }
+        });
+        
+        function recalculateTimer() {
+            if (!timerStart || !isRunning) return;
+            
+            const now = new Date();
+            const elapsedSeconds = Math.floor((now - timerStart) / 1000);
+            
+            const useCountdown = document.getElementById('useCountdown').checked;
+            
+            if (useCountdown) {
+                const countdownMinutes = parseInt(document.getElementById('countdownMinutes').value) || 60;
+                const totalSeconds = countdownMinutes * 60;
+                timerSeconds = Math.max(0, totalSeconds - elapsedSeconds);
+                
+                // Countdown abgelaufen während App im Hintergrund war?
+                if (timerSeconds <= 0) {
+                    timerSeconds = 0;
+                    stopTimer();
+                    notifyTimerEnd();
+                    return;
+                }
+            } else {
+                timerSeconds = elapsedSeconds;
+            }
+            
+            updateTimerDisplay();
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if (isRunning) saveTimerState();
+        });
+
+        window.addEventListener('pagehide', () => {
+            if (isRunning) saveTimerState();
+        });
+        
+        // iOS Safari: pageshow Event für zurückkehren aus Hintergrund
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted && isRunning && timerStart) {
+                recalculateTimer();
+                console.log('📱 pageshow - Timer aktualisiert');
+            }
+        });
+        
+        // Fokus-Event als zusätzlicher Fallback
+        window.addEventListener('focus', () => {
+            if (isRunning && timerStart) {
+                recalculateTimer();
+            }
+        });
+
+        setInterval(() => {
+            if (isRunning) saveTimerState();
+        }, 30000);
+
+        // PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    </script>
+</body>
+</html>
