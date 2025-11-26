@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e40af">
+    <title>Zeiterfassung Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
+    
+    <style>
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.7; }
+            100% { transform: scale(0.95); opacity: 1; }
+        }
+        .timer-active { animation: pulse-ring 1.5s ease-in-out infinite; }
+        .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; }
+        input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+        .modal-backdrop { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+        body { -webkit-tap-highlight-color: transparent; }
+        .sync-indicator { transition: all 0.3s; }
+        .sync-indicator.syncing { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    
+    <!-- ==================== LOGIN SCREEN ==================== -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-2xl p-8 max-w-md w-full border border-gray-700 text-center">
+            <div class="text-6xl mb-4">⏱️</div>
+            <h1 class="text-2xl font-bold mb-2">Zeiterfassung Pro</h1>
+            <p class="text-gray-400 mb-8">Cloud-Synchronisation für alle Geräte</p>
+            
+            <button onclick="signInWithGoogle()" id="loginBtn" class="w-full py-4 bg-white text-gray-800 rounded-xl font-medium flex items-center justify-center gap-3 hover:bg-gray-100 transition-all">
+                <svg class="w-6 h-6" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Mit Google anmelden
+            </button>
+            
+            <div class="mt-6 text-xs text-gray-500">
+                Deine Daten werden sicher in der Cloud gespeichert
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN APP ==================== -->
+    <div id="app" class="max-w-2xl mx-auto pb-20 hidden">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-blue-800 to-blue-600 p-4 sticky top-0 z-40 shadow-lg">
+            <div class="flex items-center justify-between">
+                <h1 class="text-xl font-bold flex items-center gap-2">
+                    <span class="text-2xl">⏱️</span>
+                    Zeiterfassung Pro
+                </h1>
+                <div class="flex items-center gap-2">
+                    <div id="syncStatus" class="sync-indicator text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
+                        ☁️ Sync
+                    </div>
+                    <button onclick="showUserMenu()" id="userAvatar" class="w-8 h-8 rounded-full bg-gray-700 overflow-hidden">
+                        <img id="userPhoto" src="" alt="" class="w-full h-full object-cover">
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- User Menu Dropdown -->
+        <div id="userMenu" class="hidden absolute right-4 top-16 bg-gray-800 rounded-xl border border-gray-700 shadow-xl z-50 w-64">
+            <div class="p-4 border-b border-gray-700">
+                <div id="userName" class="font-medium"></div>
+                <div id="userEmail" class="text-xs text-gray-400"></div>
+            </div>
+            <div class="p-2">
+                <button onclick="signOut()" class="w-full text-left px-4 py-2 hover:bg-gray-700 rounded-lg text-sm text-red-400">
+                    🚪 Abmelden
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="flex bg-gray-800 border-b border-gray-700 sticky top-16 z-30">
+            <button onclick="showTab('timer')" id="tab-timer" class="flex-1 py-3 text-sm font-medium tab-active">⏱️ Timer</button>
+            <button onclick="showTab('entries')" id="tab-entries" class="flex-1 py-3 text-sm font-medium text-gray-400">📋 Einträge</button>
+            <button onclick="showTab('projects')" id="tab-projects" class="flex-1 py-3 text-sm font-medium text-gray-400">📁 Projekte</button>
+            <button onclick="showTab('dashboard')" id="tab-dashboard" class="flex-1 py-3 text-sm font-medium text-gray-400">📊 Stats</button>
+            <button onclick="showTab('export')" id="tab-export" class="flex-1 py-3 text-sm font-medium text-gray-400">💾 Export</button>
+        </nav>
+
+        <!-- Timer Tab -->
+        <div id="content-timer" class="p-4 space-y-4">
+            <!-- Projekt & Ort Auswahl -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Projekt</label>
+                    <select id="currentProject" class="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm">
+                        <option value="">-- Kein Projekt --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Arbeitsort</label>
+                    <div class="flex gap-2">
+                        <button onclick="setLocation(true)" id="btn-ho" class="flex-1 py-3 rounded-lg text-sm font-medium bg-blue-600">🏠 HO</button>
+                        <button onclick="setLocation(false)" id="btn-office" class="flex-1 py-3 rounded-lg text-sm font-medium bg-gray-700">🏢 Büro</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tätigkeit -->
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Tätigkeit (optional)</label>
+                <input type="text" id="currentActivity" placeholder="z.B. Meeting, Dokumentation..." class="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm">
+            </div>
+
+            <!-- Timer Display -->
+            <div id="timerDisplay" class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 text-center border border-gray-700">
+                <div id="timerValue" class="text-6xl font-mono font-bold text-blue-400 mb-4">00:00:00</div>
+                <div id="timerStatus" class="text-gray-400 text-sm mb-4">Bereit zum Starten</div>
+                <div class="flex gap-3 justify-center">
+                    <button onclick="toggleTimer()" id="btnStartStop" class="px-8 py-4 bg-green-600 hover:bg-green-500 rounded-xl text-lg font-bold transition-all">
+                        ▶️ Start
+                    </button>
+                    <button onclick="resetTimer()" class="px-6 py-4 bg-gray-700 hover:bg-gray-600 rounded-xl text-lg transition-all">
+                        🔄
+                    </button>
+                </div>
+            </div>
+
+            <!-- Countdown Option -->
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" id="useCountdown" class="w-5 h-5 rounded" onchange="toggleCountdownMode()">
+                    <label for="useCountdown" class="text-sm">Countdown-Modus</label>
+                    <input type="number" id="countdownMinutes" placeholder="Min" min="1" max="480" value="60" class="w-20 bg-gray-700 border border-gray-600 rounded p-2 text-sm ml-auto" disabled>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-700 grid grid-cols-2 gap-2">
+                    <button onclick="testAlarm()" class="py-2 bg-orange-700 hover:bg-orange-600 rounded-lg text-sm font-medium">
+                        🔔 Sound testen
+                    </button>
+                    <button onclick="testPushNotification()" class="py-2 bg-purple-700 hover:bg-purple-600 rounded-lg text-sm font-medium">
+                        📲 Push testen
+                    </button>
+                </div>
+                <div class="mt-2">
+                    <button onclick="checkNotificationStatus()" id="btnNotifyStatus" class="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium">
+                        🔕 Push aktivieren
+                    </button>
+                </div>
+                <p class="mt-2 text-xs text-gray-500 text-center">
+                    ☁️ Cloud-Alarm sendet Push auch bei geschlossener App
+                </p>
+            </div>
+
+            <!-- Manueller Eintrag -->
+            <details class="bg-gray-800 rounded-xl border border-gray-700">
+                <summary class="p-4 cursor-pointer text-sm font-medium">➕ Manueller Eintrag</summary>
+                <div class="p-4 pt-0 space-y-3">
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="text-xs text-gray-400">Datum</label>
+                            <input type="date" id="manualDate" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400">Start</label>
+                            <input type="time" id="manualStart" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400">Ende</label>
+                            <input type="time" id="manualEnd" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm">
+                        </div>
+                    </div>
+                    <button onclick="addManualEntry()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium">
+                        ✅ Eintrag hinzufügen
+                    </button>
+                </div>
+            </details>
+
+            <!-- Heutige Einträge -->
+            <div class="bg-gray-800 rounded-xl border border-gray-700">
+                <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                    <h3 class="font-medium">📅 Heute</h3>
+                    <span id="todayTotal" class="text-blue-400 font-mono">0.00 h</span>
+                </div>
+                <div id="todayEntries" class="max-h-64 overflow-y-auto"></div>
+            </div>
+        </div>
+
+        <!-- Einträge Tab -->
+        <div id="content-entries" class="p-4 space-y-4 hidden">
+            <div class="flex gap-2">
+                <input type="date" id="filterDate" class="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm" onchange="filterEntries()">
+                <select id="filterProject" class="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm" onchange="filterEntries()">
+                    <option value="">Alle Projekte</option>
+                </select>
+                <button onclick="toggleSortOrder()" id="btnSortOrder" class="px-4 bg-gray-700 hover:bg-gray-600 rounded-lg text-xl" title="Sortierung ändern">
+                    ⬇️
+                </button>
+            </div>
+            <div id="entriesList" class="space-y-2"></div>
+            <div id="entriesStats" class="bg-gray-800 rounded-xl p-4 text-center text-sm text-gray-400"></div>
+        </div>
+
+        <!-- Projekte Tab -->
+        <div id="content-projects" class="p-4 space-y-4 hidden">
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <h3 class="font-medium mb-3">➕ Neues Projekt</h3>
+                <div class="flex gap-2">
+                    <input type="text" id="newProjectName" placeholder="Projektname" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                    <input type="color" id="newProjectColor" value="#3B82F6" class="w-12 h-12 rounded-lg cursor-pointer">
+                    <button onclick="addProject()" class="px-4 bg-green-600 hover:bg-green-500 rounded-lg">✅</button>
+                </div>
+            </div>
+            <div id="projectsList" class="space-y-2"></div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="content-dashboard" class="p-4 space-y-4 hidden">
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="setDashboardPeriod('week')" id="dash-week" class="px-4 py-2 bg-blue-600 rounded-lg text-sm">Diese Woche</button>
+                <button onclick="setDashboardPeriod('month')" id="dash-month" class="px-4 py-2 bg-gray-700 rounded-lg text-sm">Dieser Monat</button>
+                <button onclick="setDashboardPeriod('year')" id="dash-year" class="px-4 py-2 bg-gray-700 rounded-lg text-sm">Dieses Jahr</button>
+                <button onclick="setDashboardPeriod('all')" id="dash-all" class="px-4 py-2 bg-gray-700 rounded-lg text-sm">Alles</button>
+                <button onclick="setDashboardPeriod('custom')" id="dash-custom" class="px-4 py-2 bg-gray-700 rounded-lg text-sm">📅 Zeitraum</button>
+            </div>
+
+            <div id="dashboardDateRange" class="hidden grid grid-cols-2 gap-3 bg-gray-800 rounded-xl p-3 border border-gray-700">
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Von</label>
+                    <input type="date" id="dashFrom" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm" onchange="updateDashboard()">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Bis</label>
+                    <input type="date" id="dashTo" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm" onchange="updateDashboard()">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-gradient-to-br from-blue-900 to-blue-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold" id="statTotalHours">0</div>
+                    <div class="text-xs text-blue-300">Stunden gesamt</div>
+                </div>
+                <div class="bg-gradient-to-br from-green-900 to-green-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold" id="statAvgPerDay">0</div>
+                    <div class="text-xs text-green-300">Ø Stunden/Tag</div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-900 to-purple-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold" id="statWorkDays">0</div>
+                    <div class="text-xs text-purple-300">Arbeitstage</div>
+                </div>
+                <div class="bg-gradient-to-br from-orange-900 to-orange-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold" id="statEntries">0</div>
+                    <div class="text-xs text-orange-300">Einträge</div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <h3 class="font-medium mb-3">🏠 Homeoffice vs. 🏢 Büro</h3>
+                <div class="flex gap-4">
+                    <div class="flex-1 text-center">
+                        <div class="text-2xl font-bold text-blue-400" id="statHomeoffice">0%</div>
+                        <div class="text-xs text-gray-400">Homeoffice</div>
+                    </div>
+                    <div class="flex-1 text-center">
+                        <div class="text-2xl font-bold text-orange-400" id="statOffice">0%</div>
+                        <div class="text-xs text-gray-400">Büro</div>
+                    </div>
+                </div>
+                <div class="mt-3 h-4 bg-gray-700 rounded-full overflow-hidden flex">
+                    <div id="hoBar" class="bg-blue-500 transition-all" style="width: 50%"></div>
+                    <div id="officeBar" class="bg-orange-500 transition-all" style="width: 50%"></div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <h3 class="font-medium mb-3">📊 Stunden nach Projekt</h3>
+                <div id="projectStats" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- Export Tab -->
+        <div id="content-export" class="p-4 space-y-4 hidden">
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 space-y-4">
+                <h3 class="font-medium">📤 Daten exportieren</h3>
+                
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Zeitraum</label>
+                    <select id="exportPeriod" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm" onchange="toggleCustomDates()">
+                        <option value="today">Heute</option>
+                        <option value="week">Diese Woche</option>
+                        <option value="month">Dieser Monat</option>
+                        <option value="year">Dieses Jahr</option>
+                        <option value="all">Alle Einträge</option>
+                        <option value="custom">📅 Benutzerdefiniert...</option>
+                    </select>
+                </div>
+
+                <div id="customDateRange" class="grid grid-cols-2 gap-3 hidden">
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block">Von</label>
+                        <input type="date" id="exportFrom" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block">Bis</label>
+                        <input type="date" id="exportTo" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="exportXLSX()" class="py-3 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-medium">📊 XLSX</button>
+                    <button onclick="exportPDF()" class="py-3 bg-red-700 hover:bg-red-600 rounded-lg text-sm font-medium">📄 PDF</button>
+                    <button onclick="exportCSV()" class="py-3 bg-blue-700 hover:bg-blue-600 rounded-lg text-sm font-medium">📋 CSV</button>
+                    <button onclick="exportJSON()" class="py-3 bg-purple-700 hover:bg-purple-600 rounded-lg text-sm font-medium">💾 JSON</button>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 space-y-4">
+                <h3 class="font-medium">📥 Daten importieren</h3>
+                <input type="file" id="importFile" accept=".json" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm" onchange="importJSON()">
+                <p class="text-xs text-gray-500">JSON-Backup importieren (Daten werden hinzugefügt)</p>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl p-4 border border-red-900 space-y-4">
+                <h3 class="font-medium text-red-400">⚠️ Gefahrenzone</h3>
+                <button onclick="clearAllData()" class="w-full py-3 bg-red-900 hover:bg-red-800 rounded-lg text-sm font-medium">🗑️ Alle Daten löschen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-backdrop">
+        <div class="bg-gray-800 rounded-2xl p-6 m-4 max-w-md w-full border border-gray-700 shadow-2xl">
+            <h3 class="text-lg font-bold mb-4">✏️ Eintrag bearbeiten</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-gray-400">Datum</label>
+                    <input type="date" id="editDate" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-gray-400">Start</label>
+                        <input type="time" id="editStart" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400">Ende</label>
+                        <input type="time" id="editEnd" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400">Projekt</label>
+                    <select id="editProject" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm"></select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400">Tätigkeit</label>
+                    <input type="text" id="editActivity" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400">Arbeitsort</label>
+                    <select id="editLocation" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-sm">
+                        <option value="true">🏠 Homeoffice</option>
+                        <option value="false">🏢 Büro</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="closeEditModal()" class="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm">Abbrechen</button>
+                <button onclick="saveEdit()" class="flex-1 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium">💾 Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // FIREBASE CONFIGURATION - HIER DEINE DATEN EINTRAGEN!
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDJcK71mE0pjol-2loS9q9XhXFwxnJMu6U",
+            authDomain: "appazeit.firebaseapp.com",
+            projectId: "appazeit",
+            storageBucket: "appazeit.firebasestorage.app",
+            messagingSenderId: "977328058000",
+            appId: "1:977328058000:web:360b79579689552423b215"
+        };
+        // ============================================================
+
+        // Firebase initialisieren
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const functions = firebase.functions();
+        
+        // Firebase Messaging (für Push-Notifications)
+        let messaging = null;
+        let fcmToken = null;
+        
+        // Messaging nur initialisieren wenn unterstützt
+        if ('Notification' in window && firebase.messaging.isSupported()) {
+            messaging = firebase.messaging();
+            
+            // Foreground Messages empfangen
+            messaging.onMessage((payload) => {
+                console.log('🔔 Foreground Message:', payload);
+                // Zeige Notification auch wenn App aktiv ist
+                playAlarmSound();
+                showAlarmModal();
+            });
+        }
+        
+        // Offline-Persistenz aktivieren
+        db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+            console.log('Offline-Persistenz nicht verfügbar:', err.code);
+        });
+
+        // ==================== STATE ====================
+        let entries = [];
+        let projects = {};
+        let timerInterval = null;
+        let timerStart = null;
+        let timerSeconds = 0;
+        let isRunning = false;
+        let isHomeoffice = true;
+        let editingEntryId = null;
+        let dashboardPeriod = 'week';
+        let currentUser = null;
+        let unsubscribeEntries = null;
+        let unsubscribeProjects = null;
+        let sortOrderDescending = true; // true = neueste zuerst, false = älteste zuerst
+        
+        // Audio Context für Alarm (muss durch User-Klick aktiviert werden)
+        let audioCtx = null;
+        
+        function initAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            // iOS Safari: Context "entsperren" durch leisen Ton
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            // Stiller Ton um Audio zu aktivieren
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.value = 0.001; // Fast unhörbar
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.1);
+        }
+
+        // ==================== INITIAL PROJECTS ====================
+        const INITIAL_PROJECTS = {
+            'AFT': { name: 'AFT', color: '#3B82F6' },
+            'Daily': { name: 'Daily', color: '#10B981' },
+            'Dienstreise': { name: 'Dienstreise', color: '#F59E0B' },
+            'GPR-Sitzung': { name: 'GPR-Sitzung', color: '#EF4444' },
+            'Klausur': { name: 'Klausur', color: '#8B5CF6' },
+            'ÖPR-Sitzung': { name: 'ÖPR-Sitzung', color: '#EC4899' },
+            'DS/ITS JourFixe': { name: 'DS/ITS JourFixe', color: '#06B6D4' },
+            'JourFixe TuG': { name: 'JourFixe TuG', color: '#84CC16' },
+            'PR! Nachgefragt': { name: 'PR! Nachgefragt', color: '#F97316' },
+            'Personalversammlung': { name: 'Personalversammlung', color: '#A855F7' },
+            'Sprechstunde FM': { name: 'Sprechstunde FM', color: '#14B8A6' }
+        };
+
+        // ==================== AUTHENTICATION ====================
+        
+        // Auth State Observer
+        auth.onAuthStateChanged(user => {
+            console.log('Auth State:', user ? user.email : 'nicht angemeldet');
+            if (user) {
+                currentUser = user;
+                showApp();
+                setupRealtimeSync();
+                restoreTimerState();
+            } else {
+                currentUser = null;
+                showLogin();
+                cleanupSync();
+            }
+        });
+
+        async function signInWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            provider.setCustomParameters({ prompt: 'select_account' });
+            
+            // Immer Popup verwenden - funktioniert besser auf allen Plattformen
+            try {
+                document.getElementById('loginBtn').disabled = true;
+                document.getElementById('loginBtn').innerHTML = '⏳ Anmelden...';
+                
+                await auth.signInWithPopup(provider);
+                console.log('✅ Login erfolgreich');
+            } catch (err) {
+                console.error('Login Error:', err.code, err.message);
+                
+                document.getElementById('loginBtn').disabled = false;
+                document.getElementById('loginBtn').innerHTML = '<svg class="w-6 h-6" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Mit Google anmelden';
+                
+                if (err.code === 'auth/popup-blocked') {
+                    alert('⚠️ Popup wurde blockiert!\n\nBitte erlaube Popups für diese Seite:\n\n' +
+                          '📱 iPhone/iPad:\n' +
+                          '1. Einstellungen → Safari\n' +
+                          '2. "Popups blockieren" deaktivieren\n' +
+                          '3. Seite neu laden und erneut versuchen');
+                } else if (err.code === 'auth/popup-closed-by-user') {
+                    // Benutzer hat Popup geschlossen - nichts tun
+                } else if (err.code === 'auth/cancelled-popup-request') {
+                    // Ignorieren
+                } else if (err.code === 'auth/network-request-failed') {
+                    alert('❌ Netzwerkfehler. Bitte Internetverbindung prüfen.');
+                } else {
+                    alert('❌ Login fehlgeschlagen: ' + err.message);
+                }
+            }
+        }
+
+        function signOut() {
+            auth.signOut();
+            hideUserMenu();
+        }
+
+        function showLogin() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('app').classList.add('hidden');
+        }
+
+        function showApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+            
+            // User Info anzeigen
+            document.getElementById('userPhoto').src = currentUser.photoURL || '';
+            document.getElementById('userName').textContent = currentUser.displayName || 'User';
+            document.getElementById('userEmail').textContent = currentUser.email || '';
+            
+            initUI();
+        }
+
+        function showUserMenu() {
+            document.getElementById('userMenu').classList.toggle('hidden');
+        }
+
+        function hideUserMenu() {
+            document.getElementById('userMenu').classList.add('hidden');
+        }
+
+        // Click outside to close menu
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#userAvatar') && !e.target.closest('#userMenu')) {
+                hideUserMenu();
+            }
+        });
+
+        // ==================== FIRESTORE SYNC ====================
+        function setupRealtimeSync() {
+            if (!currentUser) return;
+            
+            setSyncStatus('syncing');
+            
+            // Entries listener
+            unsubscribeEntries = db.collection('users').doc(currentUser.uid)
+                .collection('entries')
+                .orderBy('datum', 'desc')
+                .onSnapshot(snapshot => {
+                    entries = [];
+                    snapshot.forEach(doc => {
+                        entries.push({ id: doc.id, ...doc.data() });
+                    });
+                    updateTodayView();
+                    if (document.getElementById('content-entries').classList.contains('hidden') === false) {
+                        filterEntries();
+                    }
+                    if (document.getElementById('content-dashboard').classList.contains('hidden') === false) {
+                        updateDashboard();
+                    }
+                    setSyncStatus('synced');
+                }, err => {
+                    console.error('Entries sync error:', err);
+                    setSyncStatus('error');
+                });
+            
+            // Projects listener
+            unsubscribeProjects = db.collection('users').doc(currentUser.uid)
+                .collection('projects')
+                .onSnapshot(snapshot => {
+                    if (snapshot.empty) {
+                        // Initialize with default projects
+                        initializeProjects();
+                    } else {
+                        projects = {};
+                        snapshot.forEach(doc => {
+                            projects[doc.id] = doc.data();
+                        });
+                        updateProjectSelects();
+                        if (document.getElementById('content-projects').classList.contains('hidden') === false) {
+                            renderProjects();
+                        }
+               
