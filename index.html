@@ -2493,19 +2493,21 @@
                     // Zeiteinträge importieren
                     if (data.entries && Array.isArray(data.entries)) {
                         console.log(`📝 Importiere ${data.entries.length} Einträge...`);
+                        console.log(`  Lokale entries zum Vergleich: ${entries.length}`);
+                        
                         for (const entry of data.entries) {
                             // Check if entry already exists (by datum+start+ende)
-                            const exists = entries.some(e => 
+                            const exists = entries && entries.length > 0 && entries.some(e => 
                                 e.datum === entry.datum && 
                                 e.start === entry.start && 
                                 e.ende === entry.ende
                             );
                             
-                            if (!exists) {
+                            if (!exists && entry.datum && entry.start) {
                                 await db.collection('users').doc(currentUser.uid).collection('entries').add({
                                     datum: entry.datum,
                                     start: entry.start,
-                                    ende: entry.ende,
+                                    ende: entry.ende || '',
                                     projekt: entry.projekt || '',
                                     taetigkeit: entry.taetigkeit || '',
                                     homeoffice: entry.homeoffice || false,
