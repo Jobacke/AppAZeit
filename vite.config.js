@@ -5,11 +5,14 @@ export default defineConfig({
     plugins: [
         VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['icon-192.png', 'icon-512.png', 'manifest.json'],
+            manifestFilename: 'manifest.json',
+            includeAssets: ['icon-192.png', 'icon-512.png'],
             manifest: {
                 name: 'Zeiterfassung Pro',
                 short_name: 'Zeiterfassung',
                 description: 'Professionelle Arbeitszeiterfassung',
+                start_url: '/',
+                scope: '/',
                 theme_color: '#1e40af',
                 background_color: '#111827',
                 display: 'standalone',
