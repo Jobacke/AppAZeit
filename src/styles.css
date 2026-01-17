@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Custom Animations and Styles from original index.html */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.05);
+    opacity: 0.7;
+  }
+
+  100% {
+    transform: scale(0.95);
+    opacity: 1;
+  }
+}
+
+.timer-active {
+  animation: pulse-ring 1.5s ease-in-out infinite;
+}
+
+.tab-active {
+  @apply border-b-2 border-blue-500 text-blue-500;
+}
+
+.modal-backdrop {
+  @apply bg-black/50 backdrop-blur-sm;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-600 rounded;
+}
+
+.sync-indicator {
+  transition: all 0.3s;
+}
+
+.sync-indicator.syncing {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Utility to show modals (replacing inline styles) */
+
+/* Alarm Animation */
+@keyframes alarm-flash {
+
+  0%,
+  100% {
+    opacity: 0.8;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.alarm-flash {
+  animation: alarm-flash 0.5s ease-in-out infinite;
+}
