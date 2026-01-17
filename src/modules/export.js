@@ -1,7 +1,6 @@
 import { state } from '../store.js';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { showToast, formatDate } from './ui.js';
 
 export function initExport() {
@@ -12,8 +11,20 @@ export function initExport() {
     window.importJSON = importJSON;
 }
 
+function getToday() {
+    return new Date().toISOString().split('T')[0];
+}
 
-export function exportXLSX() {
+function calculateHours(start, ende) {
+    if (!start || !ende) return 0;
+    const [h1, m1] = start.split(':').map(Number);
+    const [h2, m2] = ende.split(':').map(Number);
+    const min1 = h1 * 60 + m1;
+    const min2 = h2 * 60 + m2;
+    return Math.round((min2 - min1) / 60 * 100) / 100;
+}
+
+function getExportEntries() {
     const period = document.getElementById('exportPeriod').value;
     let dataToExport = state.entries;
 
@@ -21,14 +32,230 @@ export function exportXLSX() {
         const { start, end } = getExportDateRange(period);
         dataToExport = dataToExport.filter(e => e.datum >= start && e.datum <= end);
     }
+    return dataToExport;
+}
 
-    // Sort logic
+export function exportPDF() {
+    const rawData = getExportEntries();
+    if (rawData.length === 0) { alert('Keine Daten zum Exportieren'); return; }
+
+    // Zusammenhängende Zeiten zusammenfassen
+    const data = mergeConsecutiveEntries(rawData);
+
+    // Querformat: 'l' = landscape
+    const doc = new jsPDF('l', 'mm', 'a4');
+
+    doc.setFontSize(18);
+    doc.text('Zeiterfassung', 14, 22);
+    doc.setFontSize(10);
+    doc.text(`Erstellt am: ${formatDate(getToday())}`, 14, 30);
+    doc.text(`${data.length} Zeitblöcke (aus ${rawData.length} Einträgen)`, 14, 36);
+
+    let y = 50;
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+    // Spaltenbreiten angepasst: Datum, Start, Ende, Stunden, Ort reduziert; Projekte und Tätigkeiten erweitert
+    doc.text('Datum', 14, y);
+    doc.text('Projekte', 40, y);
+    doc.text('Tätigkeiten', 110, y);
+    doc.text('Start', 195, y);
+    doc.text('Ende', 212, y);
+    doc.text('Std', 230, y);
+    doc.text('Ort', 250, y);
+
+    // Linie unter Kopfzeile
+    y += 2;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(14, y, 270, y);
+
+    doc.setFont(undefined, 'normal');
+    y += 6;
+
+    let currentDay = null;
+    let dayCounter = 0;
+
+    data.forEach((e, index) => {
+        if (y > 190) { doc.addPage(); y = 20; currentDay = null; }
+
+        // Tagwechsel erkennen
+        const isDayChange = e.datum !== currentDay;
+        if (isDayChange) {
+            currentDay = e.datum;
+            dayCounter++;
+        }
+
+        // Hintergrundfarbe pro Tag alternierend
+        if (dayCounter % 2 === 0) {
+            doc.setFillColor(240, 255, 240); // Dezentes Grün
+            doc.rect(10, y - 4, 277, 6, 'F');
+        }
+
+        // Trennlinie vor neuem Tag (NACH dem Hintergrund, damit sie sichtbar bleibt)
+        if (isDayChange && index > 0) {
+            doc.setDrawColor(180, 180, 180);
+            doc.setLineWidth(0.4);
+            doc.line(14, y - 3, 270, y - 3);
+        }
+
+        // Text
+        doc.setTextColor(0, 0, 0);
+        doc.text(formatDate(e.datum), 14, y);
+        doc.text((e.projekte || []).join(', ').substring(0, 40), 40, y);
+        doc.text((e.taetigkeiten || []).join(', ').substring(0, 50), 110, y);
+        doc.text(e.start || '', 195, y);
+        doc.text(e.ende || '', 212, y);
+        doc.text((e.stunden || 0).toFixed(2), 230, y);
+        doc.text(e.homeoffice ? 'HO' : 'Büro', 250, y);
+
+        y += 6;
+    });
+
+    const totalHours = data.reduce((sum, e) => sum + (e.stunden || 0), 0);
+
+    // Statistik berechnen
+    const uniqueDates = [...new Set(data.map(e => e.datum))];
+    const workDays = uniqueDates.length;
+    const avgPerDay = workDays > 0 ? totalHours / workDays : 0;
+    const regelarbeitszeit = 7.8;
+    const percentOfRegular = regelarbeitszeit > 0 ? (avgPerDay / regelarbeitszeit * 100) : 0;
+
+    // Homeoffice vs. Büro
+    const hoHours = data.filter(e => e.homeoffice).reduce((sum, e) => sum + (e.stunden || 0), 0);
+    const officeHours = data.filter(e => !e.homeoffice).reduce((sum, e) => sum + (e.stunden || 0), 0);
+    const hoPct = totalHours > 0 ? (hoHours / totalHours * 100) : 0;
+    const officePct = totalHours > 0 ? (officeHours / totalHours * 100) : 0;
+
+    // Wochenarbeitszeit (Hochrechnung auf 5-Tage-Woche)
+    const weekHours = avgPerDay * 5;
+    const weekPercent = (weekHours / 39) * 100;
+
+    y += 5;
+    doc.setFont(undefined, 'bold');
+    doc.text(`Gesamt: ${totalHours.toFixed(2)} Stunden`, 14, y);
+
+    y += 10;
+    doc.setFontSize(11);
+    doc.text('STATISTIK', 14, y);
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    y += 6;
+    doc.text(`Arbeitstage: ${workDays}`, 14, y);
+    y += 5;
+
+    // Ø Stunden/Tag - farblich markieren
+    const avgDayColor = avgPerDay < 7.8 ? [255, 0, 0] : [0, 170, 0]; // Rot oder Grün
+    doc.setTextColor(avgDayColor[0], avgDayColor[1], avgDayColor[2]);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Ø Stunden/Tag: ${avgPerDay.toFixed(2)}h`, 14, y);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0); // Zurück zu Schwarz
+    y += 5;
+
+    // % zur Regelarbeitszeit - farblich markieren
+    const percentColor = percentOfRegular < 100 ? [255, 0, 0] : [0, 170, 0]; // Rot oder Grün
+    doc.setTextColor(percentColor[0], percentColor[1], percentColor[2]);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Ø % zur Regelarbeitszeit (7,8h): ${percentOfRegular.toFixed(1)}%`, 14, y);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0); // Zurück zu Schwarz
+    y += 5;
+
+    // Wochenarbeitszeit - farblich markieren
+    const weekHoursColor = weekHours < 39 ? [255, 0, 0] : [0, 170, 0]; // Rot oder Grün
+    doc.setTextColor(weekHoursColor[0], weekHoursColor[1], weekHoursColor[2]);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Hochrechnung Woche (5 Tage): ${weekHours.toFixed(2)}h (${weekPercent.toFixed(1)}%)`, 14, y);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0); // Zurück zu Schwarz
+
+    y += 10;
+    doc.setFont(undefined, 'bold');
+    doc.text('ARBEITSORT-VERTEILUNG', 14, y);
+    doc.setFont(undefined, 'normal');
+    y += 6;
+    doc.text(`Homeoffice: ${hoHours.toFixed(2)}h (${hoPct.toFixed(1)}%)`, 14, y);
+    y += 5;
+
+    // Büro-Prozent - farblich markieren
+    const bueroColor = officePct < 50 ? [255, 0, 0] : [0, 170, 0]; // Rot oder Grün
+    doc.setTextColor(bueroColor[0], bueroColor[1], bueroColor[2]);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Büro: ${officeHours.toFixed(2)}h (${officePct.toFixed(1)}%)`, 14, y);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0); // Zurück zu Schwarz
+
+    doc.save(`Zeiterfassung_${getToday()}.pdf`);
+}
+
+function mergeConsecutiveEntries(data) {
+    // Sortieren nach Datum und Startzeit
+    const sorted = [...data].sort((a, b) => {
+        if (a.datum !== b.datum) return a.datum.localeCompare(b.datum);
+        return (a.start || '').localeCompare(b.start || '');
+    });
+
+    const merged = [];
+    let current = null;
+
+    for (const entry of sorted) {
+        if (!current) {
+            // Erster Eintrag
+            current = {
+                datum: entry.datum,
+                start: entry.start,
+                ende: entry.ende,
+                projekte: [entry.projekt || 'Allgemein'],
+                taetigkeiten: entry.taetigkeit ? [entry.taetigkeit] : [],
+                homeoffice: entry.homeoffice,
+                stunden: parseFloat(entry.stunden) || 0
+            };
+        } else if (
+            current.datum === entry.datum &&
+            current.ende === entry.start
+        ) {
+            // Nahtlos anschließend - zusammenfassen (egal welches Projekt)
+            current.ende = entry.ende;
+            current.stunden = calculateHours(current.start, current.ende);
+            // Projekte sammeln
+            if (entry.projekt && !current.projekte.includes(entry.projekt)) {
+                current.projekte.push(entry.projekt);
+            }
+            // Tätigkeiten sammeln
+            if (entry.taetigkeit && !current.taetigkeiten.includes(entry.taetigkeit)) {
+                current.taetigkeiten.push(entry.taetigkeit);
+            }
+        } else {
+            // Lücke - neuer Eintrag
+            merged.push(current);
+            current = {
+                datum: entry.datum,
+                start: entry.start,
+                ende: entry.ende,
+                projekte: [entry.projekt || 'Allgemein'],
+                taetigkeiten: entry.taetigkeit ? [entry.taetigkeit] : [],
+                homeoffice: entry.homeoffice,
+                stunden: parseFloat(entry.stunden) || 0
+            };
+        }
+    }
+
+    // Letzten Eintrag hinzufügen
+    if (current) {
+        merged.push(current);
+    }
+
+    return merged;
+}
+
+export function exportXLSX() {
+    const dataToExport = getExportEntries();
+
     dataToExport.sort((a, b) => {
         if (a.datum !== b.datum) return a.datum.localeCompare(b.datum);
         return (a.start || '').localeCompare(b.start || '');
     });
 
-    // Format data for export
     const formattedData = dataToExport.map(e => ({
         Datum: formatDate(e.datum),
         Start: e.start,
@@ -42,154 +269,11 @@ export function exportXLSX() {
     const ws = XLSX.utils.json_to_sheet(formattedData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Zeiten");
-    XLSX.writeFile(wb, `Zeiterfassung_${new Date().toISOString().split('T')[0]}.xlsx`);
-}
-
-export function exportPDF() {
-    const doc = new jsPDF();
-    const period = document.getElementById('exportPeriod').value;
-    let dataToExport = state.entries;
-    let dateRangeStr = "Alle Einträge";
-
-    if (period !== 'all') {
-        const { start, end } = getExportDateRange(period);
-        dataToExport = dataToExport.filter(e => e.datum >= start && e.datum <= end);
-        dateRangeStr = `${formatDate(start)} bis ${formatDate(end)}`;
-    }
-
-    // Sort: Date then Start
-    dataToExport.sort((a, b) => {
-        if (a.datum !== b.datum) return a.datum.localeCompare(b.datum);
-        return (a.start || '').localeCompare(b.start || '');
-    });
-
-    // --- Statistics ---
-    const totalHours = dataToExport.reduce((sum, e) => sum + (parseFloat(e.stunden) || 0), 0);
-    const uniqueDays = new Set(dataToExport.map(e => e.datum)).size;
-    const avgHoursPerDay = uniqueDays > 0 ? (totalHours / uniqueDays) : 0;
-    const targetHours = 7.8; // Regelarbeitszeit
-    const percentOfTarget = targetHours > 0 ? (avgHoursPerDay / targetHours) * 100 : 0;
-
-    // --- Header ---
-    doc.setFontSize(22);
-    doc.text("Zeiterfassung", 14, 20);
-
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    const createdDate = new Date().toLocaleDateString('de-DE');
-    doc.text(`Erstellt am: ${createdDate}`, 14, 28);
-
-    doc.text(`${dataToExport.length} Einträge`, 14, 34);
-    if (period !== 'all') {
-        doc.text(`Zeitraum: ${dateRangeStr}`, 14, 40);
-    }
-
-
-    // --- Table ---
-    const tableBody = dataToExport.map(e => [
-        formatDate(e.datum),
-        e.projekt || '',
-        e.taetigkeit || '',
-        e.start || '',
-        e.ende || '',
-        (parseFloat(e.stunden) || 0).toFixed(2),
-        e.homeoffice ? 'HO' : 'Büro'
-    ]);
-
-    autoTable(doc, {
-        head: [['Datum', 'Projekte', 'Tätigkeiten', 'Start', 'Ende', 'Std', 'Ort']],
-        body: tableBody,
-        startY: 45,
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [66, 66, 66] }, // Dark gray header
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        // Custom styling to match screenshot if needed
-        didParseCell: (data) => {
-            // E.g. align numbers
-            if (data.column.index === 5) { // 'Std' column
-                data.cell.styles.halign = 'right';
-            }
-        }
-    });
-
-    // --- Footer / Summary ---
-    const finalY = doc.lastAutoTable.finalY + 10;
-
-    doc.setFontSize(11);
-    doc.setTextColor(0);
-    doc.text(`Gesamt: ${totalHours.toFixed(2)} Stunden`, 14, finalY);
-
-    // Statistics Block
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text("STATISTIK", 14, finalY + 10);
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(10);
-
-    doc.text(`Arbeitstage: ${uniqueDays}`, 14, finalY + 16);
-
-    // Color for average lines
-    const isGood = avgHoursPerDay >= targetHours;
-    doc.setTextColor(isGood ? 0 : 200, isGood ? 100 : 0, 0); // simplistic color logic
-    // Actually screenshot has Red for some, Black for others?
-    // Screenshot: "Ø Stunden/Tag: 7.50h" (Red) -> because < 7.8
-    // "Ø % zur Regelarbeitszeit (7,8h): 96.2%" (Red)
-
-    if (avgHoursPerDay < targetHours) {
-        doc.setTextColor(220, 50, 50); // Red
-    } else {
-        doc.setTextColor(0, 150, 0); // Green
-    }
-
-    doc.text(`Ø Stunden/Tag: ${avgHoursPerDay.toFixed(2)}h`, 14, finalY + 22);
-    doc.text(`Ø % zur Regelarbeitszeit (${targetHours.toString().replace('.', ',')}h): ${percentOfTarget.toFixed(1)}%`, 14, finalY + 28);
-
-
-    doc.save(`Zeiterfassung_${new Date().toISOString().split('T')[0]}.pdf`);
-}
-
-function getExportDateRange(period) {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    let start = today;
-    let end = today;
-
-    if (period === 'custom') {
-        start = document.getElementById('exportFrom').value;
-        end = document.getElementById('exportTo').value;
-    } else if (period === 'week') {
-        const day = now.getDay() || 7;
-        const monday = new Date(now);
-        monday.setDate(now.getDate() - day + 1);
-        start = monday.toISOString().split('T')[0];
-    } else if (period === 'month') {
-        start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-        end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]; // Last day of month
-    } else if (period === 'year') {
-        start = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
-        end = new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0];
-    }
-    return { start, end };
-}
-
-window.toggleCustomDates = function () {
-    const period = document.getElementById('exportPeriod').value;
-    const customRange = document.getElementById('customDateRange');
-    if (period === 'custom') {
-        customRange.classList.remove('hidden');
-    } else {
-        customRange.classList.add('hidden');
-    }
+    XLSX.writeFile(wb, `Zeiterfassung_${getToday()}.xlsx`);
 }
 
 export function exportCSV() {
-    const period = document.getElementById('exportPeriod').value;
-    let dataToExport = state.entries;
-
-    if (period !== 'all') {
-        const { start, end } = getExportDateRange(period);
-        dataToExport = dataToExport.filter(e => e.datum >= start && e.datum <= end);
-    }
+    const dataToExport = getExportEntries();
 
     dataToExport.sort((a, b) => {
         if (a.datum !== b.datum) return a.datum.localeCompare(b.datum);
@@ -213,37 +297,77 @@ export function exportCSV() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `Zeiterfassung_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `Zeiterfassung_${getToday()}.csv`;
     link.click();
 }
 
 export function exportJSON() {
-    const period = document.getElementById('exportPeriod').value;
-    let dataToExport = state.entries;
-
-    if (period !== 'all') {
-        const { start, end } = getExportDateRange(period);
-        dataToExport = dataToExport.filter(e => e.datum >= start && e.datum <= end);
-    }
+    const dataToExport = getExportEntries();
 
     dataToExport.sort((a, b) => {
         if (a.datum !== b.datum) return a.datum.localeCompare(b.datum);
         return (a.start || '').localeCompare(b.start || '');
     });
 
-    // For JSON we keep raw data but sorted, as JSON is usually for machine processing
-    // However, if the user wants it "like the others", we might format it. 
-    // Standard practice for JSON export is raw data. I will keep raw data for JSON to allow re-import.
-
     const jsonContent = JSON.stringify(dataToExport, null, 2);
     const blob = new Blob([jsonContent], { type: 'application/json' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `Zeiterfassung_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `Zeiterfassung_${getToday()}.json`;
     link.click();
 }
 
 export function importJSON() {
     // Stub
+    const input = document.getElementById('importFile');
+    if (!input.files || !input.files[0]) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (Array.isArray(data)) {
+                // Here we would need DB support to bulk insert
+                // For now, let's just alert
+                alert(`Backup enthält ${data.length} Einträge. Import ist in dieser Version noch nicht vollständig implementiert.`);
+            }
+        } catch (err) {
+            alert('Fehler beim Lesen der JSON-Datei');
+        }
+    };
+    reader.readAsText(input.files[0]);
 }
 
+function getExportDateRange(period) {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    let start = today;
+    let end = today;
+
+    if (period === 'custom') {
+        start = document.getElementById('exportFrom').value;
+        end = document.getElementById('exportTo').value;
+    } else if (period === 'week') {
+        const day = now.getDay() || 7;
+        const monday = new Date(now);
+        monday.setDate(now.getDate() - day + 1);
+        start = monday.toISOString().split('T')[0];
+    } else if (period === 'month') {
+        start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    } else if (period === 'year') {
+        start = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+        end = new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0];
+    }
+    return { start, end };
+}
+
+window.toggleCustomDates = function () {
+    const period = document.getElementById('exportPeriod').value;
+    const customRange = document.getElementById('customDateRange');
+    if (period === 'custom') {
+        customRange.classList.remove('hidden');
+    } else {
+        customRange.classList.add('hidden');
+    }
+}
