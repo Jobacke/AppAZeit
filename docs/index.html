@@ -23,8 +23,8 @@
 
 
 
-  <script type="module" crossorigin src="/assets/index-BwAf_GjQ.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-BSpP-e_R.css">
+  <script type="module" crossorigin src="/assets/index-CEcIaUtY.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DQol49Hr.css">
 <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
 <body class="bg-br-900 text-white min-h-screen">
@@ -118,7 +118,7 @@
             <div class="flex items-center justify-between">
                 <h1 class="text-xl font-bold flex items-center gap-2">
                     <span class="text-2xl">⏱️</span>
-                    Zeiterfassung Pro <span class="text-xs text-blue-300 ml-2 opacity-70">v2.2</span>
+                    Zeiterfassung Pro <span class="text-xs text-blue-300 ml-2 opacity-70">v2.3</span>
                 </h1>
                 <div class="flex items-center gap-2">
                     <div id="syncStatus"
@@ -165,172 +165,164 @@
         </nav>
 
         <!-- Timer Tab -->
-        <div id="content-timer" class="p-4 space-y-4">
-            <!-- Projekt & Ort Auswahl -->
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-xs text-br-200 mb-1 block">Projekt</label>
-                    <select id="currentProject" class="w-full bg-br-800 border border-br-500 rounded-lg p-3 text-sm">
-                        <option value="">-- Kein Projekt --</option>
-                    </select>
+        <div id="content-timer" class="p-4 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start hidden">
+            <!-- Left Column: Controls -->
+            <div class="space-y-4">
+                <!-- Projekt & Ort Auswahl -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-br-200 mb-1 block">Projekt</label>
+                        <select id="currentProject"
+                            class="w-full bg-br-800 border border-br-500 rounded-lg p-3 text-sm">
+                            <option value="">-- Kein Projekt --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-br-200 mb-1 block">Arbeitsort</label>
+                        <div class="flex gap-2">
+                            <button onclick="setLocation(true)" id="btn-ho"
+                                class="flex-1 py-3 rounded-lg text-sm font-medium bg-br-500">🏠 HO</button>
+                            <button onclick="setLocation(false)" id="btn-office"
+                                class="flex-1 py-3 rounded-lg text-sm font-medium bg-br-700">🏢 Büro</button>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Tätigkeit -->
                 <div>
-                    <label class="text-xs text-br-200 mb-1 block">Arbeitsort</label>
-                    <div class="flex gap-2">
-                        <button onclick="setLocation(true)" id="btn-ho"
-                            class="flex-1 py-3 rounded-lg text-sm font-medium bg-br-500">🏠 HO</button>
-                        <button onclick="setLocation(false)" id="btn-office"
-                            class="flex-1 py-3 rounded-lg text-sm font-medium bg-br-700">🏢 Büro</button>
+                    <label class="text-xs text-br-200 mb-1 block">Tätigkeit (optional)</label>
+                    <input type="text" id="currentActivity" placeholder="z.B. Meeting, Dokumentation..."
+                        class="w-full bg-br-800 border border-br-500 rounded-lg p-3 text-sm">
+                </div>
+
+                <!-- Timer Display -->
+                <div id="timerDisplay"
+                    class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 text-center border border-br-600">
+                    <div id="timerValue" class="text-5xl font-mono font-bold text-blue-400 mb-3">00:00:00</div>
+                    <div id="timerStatus" class="text-br-200 text-sm mb-3">Bereit zum Starten</div>
+                    <div class="flex gap-3 justify-center">
+                        <button onclick="toggleTimer()" id="btnStartStop"
+                            class="px-8 py-3 bg-green-600 hover:bg-green-500 rounded-xl text-lg font-bold transition-all">
+                            ▶️ Start
+                        </button>
+                        <button onclick="resetTimer()"
+                            class="px-5 py-3 bg-br-700 hover:bg-br-600 rounded-xl text-lg transition-all">
+                            🔄
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Countdown Option -->
+                <div class="bg-br-800 rounded-xl p-3 border border-br-600">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="useCountdown" class="w-4 h-4 rounded"
+                            onchange="toggleCountdownMode()">
+                        <label for="useCountdown" class="text-sm">Countdown-Modus</label>
+                        <input type="number" id="countdownMinutes" placeholder="Min" min="1" max="480" value="60"
+                            class="w-16 bg-br-700 border border-br-500 rounded p-1 text-sm ml-auto" disabled>
+                    </div>
+                    <div class="mt-2 flex gap-2">
+                        <button onclick="testAlarm()"
+                            class="flex-1 py-2 bg-orange-700 hover:bg-orange-600 rounded-lg text-xs font-medium">
+                            🔔 Sound
+                        </button>
+                        <button onclick="activateNotifications()" id="btnNotifyStatus"
+                            class="flex-1 py-2 bg-br-700 hover:bg-br-600 rounded-lg text-xs font-medium">
+                            🔕 Push-Nachrichten
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Tätigkeit -->
-            <div>
-                <label class="text-xs text-br-200 mb-1 block">Tätigkeit (optional)</label>
-                <input type="text" id="currentActivity" placeholder="z.B. Meeting, Dokumentation..."
-                    class="w-full bg-br-800 border border-br-500 rounded-lg p-3 text-sm">
-            </div>
-
-            <!-- Timer Display -->
-            <div id="timerDisplay"
-                class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 text-center border border-br-600">
-                <div id="timerValue" class="text-6xl font-mono font-bold text-blue-400 mb-4">00:00:00</div>
-                <div id="timerStatus" class="text-br-200 text-sm mb-4">Bereit zum Starten</div>
-                <div class="flex gap-3 justify-center">
-                    <button onclick="toggleTimer()" id="btnStartStop"
-                        class="px-8 py-4 bg-green-600 hover:bg-green-500 rounded-xl text-lg font-bold transition-all">
-                        ▶️ Start
-                    </button>
-                    <button onclick="resetTimer()"
-                        class="px-6 py-4 bg-br-700 hover:bg-br-600 rounded-xl text-lg transition-all">
-                        🔄
-                    </button>
-                </div>
-            </div>
-
-            <!-- Countdown Option -->
-            <div class="bg-br-800 rounded-xl p-4 border border-br-600">
-                <div class="flex items-center gap-3">
-                    <input type="checkbox" id="useCountdown" class="w-5 h-5 rounded" onchange="toggleCountdownMode()">
-                    <label for="useCountdown" class="text-sm">Countdown-Modus</label>
-                    <input type="number" id="countdownMinutes" placeholder="Min" min="1" max="480" value="60"
-                        class="w-20 bg-br-700 border border-br-500 rounded p-2 text-sm ml-auto" disabled>
-                </div>
-                <div class="mt-3 pt-3 border-t border-br-600">
-                    <button onclick="testAlarm()"
-                        class="w-full py-2 bg-orange-700 hover:bg-orange-600 rounded-lg text-sm font-medium">
-                        🔔 Sound testen
-                    </button>
-                </div>
-                <div class="mt-2">
-                    <button onclick="activateNotifications()" id="btnNotifyStatus"
-                        class="w-full py-2 bg-br-700 hover:bg-br-600 rounded-lg text-sm font-medium">
-                        🔕 Benachrichtigungen aktivieren
-                    </button>
-                </div>
-                <p class="mt-2 text-xs text-br-300 text-center">
-                    ☁️ Cloud-Alarm sendet Push auch bei geschlossener App
-                </p>
-            </div>
-
-            <!-- Tagesstatistik: Homeoffice vs Office -->
-            <div class="bg-br-800 rounded-xl border border-br-600 p-4 space-y-4">
-                <!-- Arbeitszeit-Fortschritt -->
-                <div>
-                    <div class="flex items-center justify-between mb-2">
-                        <h3 class="text-sm font-medium text-br-200">⏰ Arbeitszeit heute</h3>
-                        <div class="text-right">
-                            <div id="todayWorkProgress" class="text-xs font-mono text-br-300">0.0h / 7.8h</div>
-                            <div id="todayWorkPercentText" class="text-lg font-bold text-green-400">0%</div>
+            <!-- Right Column: Stats & Lists -->
+            <div class="space-y-4">
+                <!-- Tagesstatistik: Homeoffice vs Office -->
+                <div class="bg-br-800 rounded-xl border border-br-600 p-4 space-y-3">
+                    <!-- Arbeitszeit-Fortschritt -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <h3 class="text-sm font-medium text-br-200">⏰ Arbeitszeit heute</h3>
+                            <div class="text-right">
+                                <span id="todayWorkProgress" class="text-xs font-mono text-br-300">0.0h / 7.8h</span>
+                                <span id="todayWorkPercentText" class="text-sm font-bold text-green-400 ml-2">0%</span>
+                            </div>
+                        </div>
+                        <div class="w-full h-4 bg-br-700 rounded-lg overflow-hidden relative">
+                            <div id="todayWorkBar"
+                                class="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-300 flex items-center justify-end pr-1"
+                                style="width: 0%;">
+                            </div>
                         </div>
                     </div>
-                    <div class="w-full h-6 bg-br-700 rounded-lg overflow-hidden relative">
-                        <div id="todayWorkBar"
-                            class="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-300 flex items-center justify-end pr-2"
-                            style="width: 0%;">
-                            <span id="todayWorkPercent" class="text-xs font-bold text-white"></span>
-                        </div>
-                    </div>
-                    <div class="flex justify-between mt-1 text-xs text-br-300">
-                        <span>0h</span>
-                        <span class="text-br-200">Regelarbeitszeit: 7,8h</span>
-                        <span>7,8h</span>
-                    </div>
-                </div>
 
-                <!-- Arbeitsort-Verteilung -->
-                <div>
-                    <div class="flex items-center justify-between mb-2">
-                        <h3 class="text-sm font-medium text-br-200">📍 Arbeitsort</h3>
-                    </div>
-                    <div class="flex gap-2 h-8 rounded-lg overflow-hidden bg-br-700">
-                        <div id="todayHoBar"
-                            class="bg-br-500 flex items-center justify-center text-xs font-medium transition-all duration-300"
-                            style="width: 50%;">
-                            <span id="todayHoLabel" class="text-white"></span>
+                    <!-- Arbeitsort-Verteilung -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <h3 class="text-sm font-medium text-br-200">📍 Arbeitsort</h3>
                         </div>
-                        <div id="todayOfficeBar"
-                            class="bg-blue-600 flex items-center justify-center text-xs font-medium transition-all duration-300"
-                            style="width: 50%;">
-                            <span id="todayOfficeLabel" class="text-white"></span>
+                        <div class="flex gap-1 h-6 rounded-lg overflow-hidden bg-br-700">
+                            <div id="todayHoBar"
+                                class="bg-br-500 flex items-center justify-center text-xs font-medium transition-all duration-300"
+                                style="width: 50%;">
+                                <span id="todayHoLabel" class="text-white text-[10px]"></span>
+                            </div>
+                            <div id="todayOfficeBar"
+                                class="bg-blue-600 flex items-center justify-center text-xs font-medium transition-all duration-300"
+                                style="width: 50%;">
+                                <span id="todayOfficeLabel" class="text-white text-[10px]"></span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="flex justify-between mt-2 text-xs text-br-300">
-                        <div class="flex items-center gap-2">
-                            <div class="w-3 h-3 rounded bg-br-500"></div>
+                        <div class="flex justify-between mt-1 text-[10px] text-br-300">
                             <span>🏠 <span id="todayHoHours">0.0h</span></span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <div class="w-3 h-3 rounded bg-blue-600"></div>
                             <span>🏢 <span id="todayOfficeHours">0.0h</span></span>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Manueller Eintrag -->
-            <details class="bg-br-800 rounded-xl border border-br-600">
-                <summary class="p-4 cursor-pointer text-sm font-medium">➕ Manueller Eintrag</summary>
-                <div class="p-4 pt-0 space-y-3">
-                    <div class="grid grid-cols-3 gap-2">
-                        <div>
-                            <label class="text-xs text-br-200">Datum</label>
-                            <input type="date" id="manualDate"
-                                class="w-full bg-br-700 border border-br-500 rounded p-2 text-sm">
-                        </div>
-                        <div>
-                            <label class="text-xs text-br-200">Start</label>
-                            <input type="time" id="manualStart"
-                                class="w-full bg-br-700 border border-br-500 rounded p-2 text-sm">
-                        </div>
-                        <div>
-                            <label class="text-xs text-br-200">Ende</label>
-                            <input type="time" id="manualEnd"
-                                class="w-full bg-br-700 border border-br-500 rounded p-2 text-sm">
-                        </div>
+                <!-- Heutige Einträge -->
+                <div class="bg-br-800 rounded-xl border border-br-600">
+                    <div class="p-3 border-b border-br-600 flex justify-between items-center">
+                        <h3 class="font-medium text-sm">📅 Heute</h3>
+                        <span id="todayTotal" class="text-blue-400 font-mono text-sm">0.00 h</span>
                     </div>
-                    <div>
-                        <label class="text-xs text-br-200">Arbeitsort</label>
-                        <select id="manualLocation" class="w-full bg-br-700 border border-br-500 rounded p-2 text-sm">
-                            <option value="false">🏢 Büro</option>
-                            <option value="true">🏠 Homeoffice</option>
-                        </select>
-                    </div>
-                    <button onclick="addManualEntry()"
-                        class="w-full py-3 bg-br-500 hover:bg-br-400 rounded-lg text-sm font-medium">
-                        ✅ Eintrag hinzufügen
-                    </button>
+                    <div id="todayEntries" class="max-h-48 overflow-y-auto"></div>
                 </div>
-            </details>
 
-            <!-- Heutige Einträge -->
-            <div class="bg-br-800 rounded-xl border border-br-600">
-                <div class="p-4 border-b border-br-600 flex justify-between items-center">
-                    <h3 class="font-medium">📅 Heute</h3>
-                    <span id="todayTotal" class="text-blue-400 font-mono">0.00 h</span>
-                </div>
-                <div id="todayEntries" class="max-h-64 overflow-y-auto"></div>
+                <!-- Manueller Eintrag (Collapsed by default) -->
+                <details class="bg-br-800 rounded-xl border border-br-600">
+                    <summary class="p-3 cursor-pointer text-sm font-medium">➕ Manueller Eintrag</summary>
+                    <div class="p-4 pt-0 space-y-3">
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="text-xs text-br-200">Datum</label>
+                                <input type="date" id="manualDate"
+                                    class="w-full bg-br-700 border border-br-500 rounded p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-xs text-br-200">Start</label>
+                                <input type="time" id="manualStart"
+                                    class="w-full bg-br-700 border border-br-500 rounded p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-xs text-br-200">Ende</label>
+                                <input type="time" id="manualEnd"
+                                    class="w-full bg-br-700 border border-br-500 rounded p-2 text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-br-200">Arbeitsort</label>
+                            <select id="manualLocation"
+                                class="w-full bg-br-700 border border-br-500 rounded p-2 text-sm">
+                                <option value="false">🏢 Büro</option>
+                                <option value="true">🏠 Homeoffice</option>
+                            </select>
+                        </div>
+                        <button onclick="addManualEntry()"
+                            class="w-full py-2 bg-br-500 hover:bg-br-400 rounded-lg text-sm font-medium">
+                            Hinzufügen
+                        </button>
+                    </div>
+                </details>
             </div>
         </div>
 
