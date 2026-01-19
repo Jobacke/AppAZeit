@@ -143,6 +143,11 @@ function saveTimerEntry() {
         endTime = new Date();
     }
 
+    // Calculate total elapsed minutes
+    const elapsedMs = endTime - state.timerStart;
+    const elapsedMinutes = Math.round(elapsedMs / 60000);
+
+    const isPause = project === 'Pause';
     const entry = {
         datum: state.timerStart.toISOString().split('T')[0],
         start: state.timerStart.toTimeString().slice(0, 5),
@@ -150,8 +155,9 @@ function saveTimerEntry() {
         projekt: project,
         taetigkeit: activity,
         homeoffice: state.isHomeoffice,
-        stunden: calculateHours(state.timerStart.toTimeString().slice(0, 5), endTime.toTimeString().slice(0, 5)),
-        pause: 0,
+        // For pause entries, work hours are 0 and pause minutes are recorded
+        stunden: isPause ? 0 : calculateHours(state.timerStart.toTimeString().slice(0, 5), endTime.toTimeString().slice(0, 5)),
+        pause: isPause ? elapsedMinutes : 0,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 

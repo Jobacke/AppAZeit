@@ -111,18 +111,20 @@ export function exportPDF() {
         y += 6;
     });
 
-    const totalHours = data.reduce((sum, e) => sum + (e.stunden || 0), 0);
+    // Filter out Pause entries for statistics
+    const workingData = data.filter(e => !e.projekte.includes('Pause'));
+    const totalHours = workingData.reduce((sum, e) => sum + (e.stunden || 0), 0);
 
     // Statistik berechnen
-    const uniqueDates = [...new Set(data.map(e => e.datum))];
+    const uniqueDates = [...new Set(workingData.map(e => e.datum))];
     const workDays = uniqueDates.length;
     const avgPerDay = workDays > 0 ? totalHours / workDays : 0;
     const regelarbeitszeit = 7.8;
     const percentOfRegular = regelarbeitszeit > 0 ? (avgPerDay / regelarbeitszeit * 100) : 0;
 
-    // Homeoffice vs. Büro
-    const hoHours = data.filter(e => e.homeoffice).reduce((sum, e) => sum + (e.stunden || 0), 0);
-    const officeHours = data.filter(e => !e.homeoffice).reduce((sum, e) => sum + (e.stunden || 0), 0);
+    // Homeoffice vs. Büro (only counting working hours)
+    const hoHours = workingData.filter(e => e.homeoffice).reduce((sum, e) => sum + (e.stunden || 0), 0);
+    const officeHours = workingData.filter(e => !e.homeoffice).reduce((sum, e) => sum + (e.stunden || 0), 0);
     const hoPct = totalHours > 0 ? (hoHours / totalHours * 100) : 0;
     const officePct = totalHours > 0 ? (officeHours / totalHours * 100) : 0;
 
@@ -212,7 +214,8 @@ function mergeConsecutiveEntries(data) {
             };
         } else if (
             current.datum === entry.datum &&
-            current.ende === entry.start
+            current.ende === entry.start &&
+            (current.projekte.includes('Pause') === (entry.projekt === 'Pause')) // Only merge if both are Pause or both are NOT Pause
         ) {
             // Nahtlos anschließend - zusammenfassen (egal welches Projekt)
             current.ende = entry.ende;

@@ -116,7 +116,7 @@ export function filterEntries() {
     } else {
         container.innerHTML = pageEntries.map(e => `
              <div class="bg-br-800 rounded-lg p-3 border border-br-600 flex items-center gap-3">
-                <div class="w-1 h-12 rounded" style="background: ${state.projects[e.projekt]?.color || '#6B7280'}"></div>
+                <div class="w-1 h-12 rounded" style="background: ${e.projekt === 'Pause' ? '#60A5FA' : (state.projects[e.projekt]?.color || '#6B7280')}"></div>
                 <div class="flex-1">
                     <div class="text-sm font-medium">${formatDate(e.datum)}</div>
                     <div class="text-xs text-br-200">${e.start} - ${e.ende} • ${e.projekt || 'Allgemein'}</div>

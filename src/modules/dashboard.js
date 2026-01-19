@@ -43,13 +43,21 @@ export function updateDashboard() {
 
     filtered.forEach(e => {
         const h = parseFloat(e.stunden || 0);
+        const pId = e.projekt || 'unknown';
+
+        if (pId === 'Pause') {
+            // Pause nicht zur Arbeitszeit zählen
+            if (!projectHours[pId]) projectHours[pId] = 0;
+            projectHours[pId] += h;
+            return;
+        }
+
         totalHours += h;
         days.add(e.datum);
 
         if (e.homeoffice) hoHours += h;
         else officeHours += h;
 
-        const pId = e.projekt || 'unknown';
         if (!projectHours[pId]) projectHours[pId] = 0;
         projectHours[pId] += h;
     });
@@ -82,9 +90,15 @@ export function updateDashboard() {
         const sortedProjects = Object.entries(projectHours).sort((a, b) => b[1] - a[1]);
 
         projectStatsContainer.innerHTML = sortedProjects.map(([pId, hours]) => {
-            const project = state.projects[pId] || { name: 'Ohne Projekt', color: '#6B7280' };
-            const pName = pId === 'unknown' ? 'Ohne Projekt' : project.name;
-            const percent = totalHours > 0 ? (hours / totalHours) * 100 : 0;
+            let project = state.projects[pId];
+            if (pId === 'Pause') {
+                project = { name: 'Pause', color: '#60A5FA' }; // Blau
+            } else if (!project) {
+                project = { name: pId === 'unknown' ? 'Ohne Projekt' : pId, color: '#6B7280' };
+            }
+
+            const pName = project.name;
+            const percent = totalHours > 0 ? (hours / totalHours) * 100 : 0; // Relative to Working Hours
 
             return `
                 <div>
