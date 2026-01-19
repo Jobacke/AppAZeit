@@ -227,32 +227,38 @@ export function showTasksDashboardOnStart() {
             if (!container) return;
             container.innerHTML = list.map(t => `
                 <div class="bg-br-700/50 p-2 rounded flex justify-between items-center">
-                    <span>${t.aufgabe}</span>
+                    <span class="${t.faelligAm < today ? 'text-red-300 font-bold' : ''}">${t.aufgabe}</span>
                     <button onclick="closeTasksDashboard(); editTask('${t.id}')" class="text-xs bg-br-600 px-2 py-1 rounded">✏️</button>
                 </div>
             `).join('');
         };
 
         if (overdue.length > 0) {
-            document.getElementById('dashOverdue').classList.remove('hidden');
+            document.getElementById('dashOverdue')?.classList.remove('hidden');
             renderSimple(overdue, 'dashOverdueList');
         } else {
-            document.getElementById('dashOverdue').classList.add('hidden');
+            document.getElementById('dashOverdue')?.classList.add('hidden');
         }
 
         if (todayTasks.length > 0) {
-            document.getElementById('dashToday').classList.remove('hidden');
+            document.getElementById('dashToday')?.classList.remove('hidden');
             renderSimple(todayTasks, 'dashTodayList');
         } else {
-            document.getElementById('dashToday').classList.add('hidden');
+            document.getElementById('dashToday')?.classList.add('hidden');
         }
 
-        document.getElementById('dashNoUrgent').classList.add('hidden');
+        document.getElementById('dashNoUrgent')?.classList.add('hidden');
 
         // Show Modal
         state.tasksDashboardShown = true;
-        document.getElementById('tasksDashboardModal').classList.remove('hidden');
-        document.getElementById('tasksDashboardModal').classList.add('flex');
+        const modal = document.getElementById('tasksDashboardModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            // Optional: Add Sound for "Alarm"
+            // const audio = new Audio('path/to/alert.mp3'); audio.play().catch(e=>{});
+        }
     }
 }
 

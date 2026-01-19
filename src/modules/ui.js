@@ -49,7 +49,7 @@ export function showApp() {
     document.getElementById('userEmail').textContent = user.email || '';
 
     // Make sure initUI is called from main
-    showTab('timer');
+    showTab('tasks');
 }
 
 export function setSyncStatus(status) {
