@@ -143,6 +143,8 @@ export function editEntry(id) {
     document.getElementById('editDate').value = entry.datum;
     document.getElementById('editStart').value = entry.start;
     document.getElementById('editEnd').value = entry.ende;
+    document.getElementById('editProject').value = entry.projekt || ''; // Fix: Set project
+    document.getElementById('editActivity').value = entry.taetigkeit || ''; // Fix: Set activity
     document.getElementById('editLocation').value = entry.homeoffice ? 'true' : 'false';
 
     const editModal = document.getElementById('editModal');
@@ -152,14 +154,31 @@ export function editEntry(id) {
 
 export function saveEdit() {
     if (!state.editingEntryId) return;
-    const originalEntry = state.entries.find(e => e.id === state.editingEntryId);
-    const isPause = originalEntry && originalEntry.projekt === 'Pause';
+    const newProject = document.getElementById('editProject').value;
+    const isPause = newProject === 'Pause';
+
+    // Calculate duration in minutes for Pause entries if needed, but for now we just handle stunden=0
+    // If we want to preserve the "pause" field in minutes when editing a Pause entry, we might need more logic,
+    // but the current requirement focuses on stunden=0 for reports.
+    // Ideally we re-calculate 'pause' in minutes if it is a Pause project.
+    let pauseVal = 0;
+    if (isPause) {
+        // Calculate minutes
+        const [h1, m1] = document.getElementById('editStart').value.split(':').map(Number);
+        const [h2, m2] = document.getElementById('editEnd').value.split(':').map(Number);
+        const min1 = h1 * 60 + m1;
+        const min2 = h2 * 60 + m2;
+        pauseVal = Math.max(0, min2 - min1);
+    }
 
     const updated = {
         datum: document.getElementById('editDate').value,
         start: document.getElementById('editStart').value,
         ende: document.getElementById('editEnd').value,
+        projekt: newProject,
+        taetigkeit: document.getElementById('editActivity').value,
         stunden: isPause ? 0 : calculateHours(document.getElementById('editStart').value, document.getElementById('editEnd').value),
+        pause: pauseVal, // Update pause minutes if it is a pause entry
         homeoffice: document.getElementById('editLocation').value === 'true'
     };
 
