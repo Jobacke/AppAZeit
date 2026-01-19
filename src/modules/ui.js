@@ -135,8 +135,14 @@ export function updateTodayView() {
 
     document.getElementById('todayWorkProgress').textContent = `${totalHours.toFixed(1)}h / ${targetHours}h`;
     document.getElementById('todayWorkPercentText').textContent = `${displayPercentage}%`;
-    document.getElementById('todayWorkPercent').textContent = displayPercentage > 10 ? `${displayPercentage}%` : '';
-    document.getElementById('todayWorkBar').style.width = `${barPercentage}%`;
+
+    const bar = document.getElementById('todayWorkBar');
+    if (bar) bar.style.width = `${barPercentage}%`;
+
+    const percentLabel = document.getElementById('todayWorkPercent');
+    if (percentLabel) {
+        percentLabel.textContent = displayPercentage > 10 ? `${displayPercentage}%` : '';
+    }
 
     // Update Homeoffice/Office Split
     const totalSplit = hoHours + officeHours;
