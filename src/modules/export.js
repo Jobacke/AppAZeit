@@ -102,7 +102,11 @@ export function exportPDF() {
         doc.setTextColor(0, 0, 0);
         doc.text(formatDate(e.datum), 14, y);
         doc.text((e.projekte || []).join(', ').substring(0, 40), 40, y);
-        doc.text((e.taetigkeiten || []).join(', ').substring(0, 50), 110, y);
+        let actStr = (e.taetigkeiten || []).join(', ');
+        if (e.entryCount > 1) {
+            actStr += " und weitere Tätigkeiten";
+        }
+        doc.text(actStr.substring(0, 55), 110, y);
         doc.text(e.start || '', 195, y);
         doc.text(e.ende || '', 212, y);
         doc.text((e.stunden || 0).toFixed(2), 230, y);
@@ -210,7 +214,8 @@ function mergeConsecutiveEntries(data) {
                 projekte: [entry.projekt || 'Allgemein'],
                 taetigkeiten: entry.taetigkeit ? [entry.taetigkeit] : [],
                 homeoffice: entry.homeoffice,
-                stunden: parseFloat(entry.stunden) || 0
+                stunden: parseFloat(entry.stunden) || 0,
+                entryCount: 1
             };
         } else if (
             current.datum === entry.datum &&
@@ -220,6 +225,7 @@ function mergeConsecutiveEntries(data) {
             // Nahtlos anschließend - zusammenfassen (egal welches Projekt)
             current.ende = entry.ende;
             current.stunden = calculateHours(current.start, current.ende);
+            current.entryCount++;
             // Projekte sammeln
             if (entry.projekt && !current.projekte.includes(entry.projekt)) {
                 current.projekte.push(entry.projekt);
@@ -238,7 +244,8 @@ function mergeConsecutiveEntries(data) {
                 projekte: [entry.projekt || 'Allgemein'],
                 taetigkeiten: entry.taetigkeit ? [entry.taetigkeit] : [],
                 homeoffice: entry.homeoffice,
-                stunden: parseFloat(entry.stunden) || 0
+                stunden: parseFloat(entry.stunden) || 0,
+                entryCount: 1
             };
         }
     }
