@@ -76,7 +76,21 @@ export function exportPDF() {
     let dayCounter = 0;
 
     data.forEach((e, index) => {
-        if (y > 190) { doc.addPage(); y = 20; currentDay = null; }
+        // Calculate wrapped text and dimensions first
+        const projectText = (e.projekte || []).join(', ');
+        const projectLines = doc.splitTextToSize(projectText, 65); // Max width approx 65mm
+
+        let actStr = (e.taetigkeiten || []).join(', ');
+        if (e.entryCount > 1) {
+            actStr += " und weitere Tätigkeiten";
+        }
+        const activityLines = doc.splitTextToSize(actStr, 80); // Max width approx 80mm
+
+        const maxLines = Math.max(projectLines.length, activityLines.length, 1);
+        const rowHeight = Math.max(6, maxLines * 4 + 2); // Dynamic height calculation
+
+        // Check page break with new rowHeight
+        if (y + rowHeight > 190) { doc.addPage(); y = 20; currentDay = null; }
 
         // Tagwechsel erkennen
         const isDayChange = e.datum !== currentDay;
@@ -88,10 +102,10 @@ export function exportPDF() {
         // Hintergrundfarbe pro Tag alternierend
         if (dayCounter % 2 === 0) {
             doc.setFillColor(240, 255, 240); // Dezentes Grün
-            doc.rect(10, y - 4, 277, 6, 'F');
+            doc.rect(10, y - 4, 277, rowHeight, 'F');
         }
 
-        // Trennlinie vor neuem Tag (NACH dem Hintergrund, damit sie sichtbar bleibt)
+        // Trennlinie vor neuem Tag
         if (isDayChange && index > 0) {
             doc.setDrawColor(180, 180, 180);
             doc.setLineWidth(0.4);
@@ -101,18 +115,14 @@ export function exportPDF() {
         // Text
         doc.setTextColor(0, 0, 0);
         doc.text(formatDate(e.datum), 14, y);
-        doc.text((e.projekte || []).join(', ').substring(0, 40), 40, y);
-        let actStr = (e.taetigkeiten || []).join(', ');
-        if (e.entryCount > 1) {
-            actStr += " und weitere Tätigkeiten";
-        }
-        doc.text(actStr.substring(0, 55), 110, y);
+        doc.text(projectLines, 40, y);
+        doc.text(activityLines, 110, y);
         doc.text(e.start || '', 195, y);
         doc.text(e.ende || '', 212, y);
         doc.text((e.stunden || 0).toFixed(2), 230, y);
         doc.text(e.homeoffice ? 'HO' : 'Büro', 250, y);
 
-        y += 6;
+        y += rowHeight;
     });
 
     // Filter out Pause entries for statistics
