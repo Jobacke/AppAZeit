@@ -21,13 +21,14 @@ export function updateProjectSelects() {
 
     if (!currentSelect) return;
 
-    const options = Object.keys(projects).sort().map(p => `<option value="${p}">${p}</option>`).join('');
-    // Add a static "Pause" option that is not stored in Firestore
-    const pauseOption = `<option value="Pause">Pause</option>`;
+    const allProjectNames = [...Object.keys(projects), 'Pause'];
+    allProjectNames.sort();
 
-    currentSelect.innerHTML = '<option value="">-- Kein Projekt --</option>' + pauseOption + options;
-    filterSelect.innerHTML = '<option value="">Alle Projekte</option>' + pauseOption + options;
-    if (editSelect) editSelect.innerHTML = '<option value="">-- Kein Projekt --</option>' + pauseOption + options;
+    const options = allProjectNames.map(p => `<option value="${p}">${p}</option>`).join('');
+
+    currentSelect.innerHTML = '<option value="">-- Kein Projekt --</option>' + options;
+    filterSelect.innerHTML = '<option value="">Alle Projekte</option>' + options;
+    if (editSelect) editSelect.innerHTML = '<option value="">-- Kein Projekt --</option>' + options;
 }
 
 export function renderProjects() {

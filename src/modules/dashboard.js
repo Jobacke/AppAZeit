@@ -46,9 +46,21 @@ export function updateDashboard() {
         const pId = e.projekt || 'unknown';
 
         if (pId === 'Pause') {
-            // Pause nicht zur Arbeitszeit zählen
+            // Pause nicht zur Arbeitszeit zählen, aber für Chart berechnen
+            let pauseDuration = 0;
+            // Use e.pause (stored in minutes) if available, otherwise calc from time strings
+            if (e.pause) {
+                pauseDuration = e.pause / 60;
+            } else if (e.start && e.ende) {
+                const [h1, m1] = e.start.split(':').map(Number);
+                const [h2, m2] = e.ende.split(':').map(Number);
+                const min1 = h1 * 60 + m1;
+                const min2 = h2 * 60 + m2;
+                pauseDuration = Math.max(0, (min2 - min1) / 60);
+            }
+
             if (!projectHours[pId]) projectHours[pId] = 0;
-            projectHours[pId] += h;
+            projectHours[pId] += pauseDuration;
             return;
         }
 

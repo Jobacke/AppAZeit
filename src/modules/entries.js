@@ -37,7 +37,7 @@ export function addManualEntry() {
         projekt,
         taetigkeit: activity,
         homeoffice: document.getElementById('manualLocation').value === 'true',
-        stunden: calculateHours(start, ende),
+        stunden: projekt === 'Pause' ? 0 : calculateHours(start, ende),
         pause: 0,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -152,11 +152,14 @@ export function editEntry(id) {
 
 export function saveEdit() {
     if (!state.editingEntryId) return;
+    const originalEntry = state.entries.find(e => e.id === state.editingEntryId);
+    const isPause = originalEntry && originalEntry.projekt === 'Pause';
+
     const updated = {
         datum: document.getElementById('editDate').value,
         start: document.getElementById('editStart').value,
         ende: document.getElementById('editEnd').value,
-        stunden: calculateHours(document.getElementById('editStart').value, document.getElementById('editEnd').value),
+        stunden: isPause ? 0 : calculateHours(document.getElementById('editStart').value, document.getElementById('editEnd').value),
         homeoffice: document.getElementById('editLocation').value === 'true'
     };
 
