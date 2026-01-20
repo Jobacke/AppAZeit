@@ -136,7 +136,7 @@ export function updateTodayView() {
     const displayPercentage = Math.round(rawPercentage);
     const barPercentage = Math.min(100, rawPercentage);
 
-    document.getElementById('todayWorkProgress').textContent = `${totalHours.toFixed(1)}h / ${targetHours}h`;
+    document.getElementById('todayWorkProgress').textContent = `${totalHours.toFixed(2)}h / ${targetHours}h`;
     document.getElementById('todayWorkPercentText').textContent = `${displayPercentage}%`;
 
     const bar = document.getElementById('todayWorkBar');
