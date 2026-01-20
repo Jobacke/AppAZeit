@@ -23,8 +23,8 @@
 
 
 
-  <script type="module" crossorigin src="/assets/index-Lb731Bny.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-BFQnoxxj.css">
+  <script type="module" crossorigin src="/assets/index-D_1aIy-Z.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Ctmdoda_.css">
 <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
 <body class="bg-br-900 text-white min-h-screen">
@@ -118,7 +118,7 @@
             <div class="flex items-center justify-between">
                 <h1 class="text-xl font-bold flex items-center gap-2">
                     <span class="text-2xl">⏱️</span>
-                    Zeiterfassung Pro <span class="text-xs text-blue-300 ml-2 opacity-70">v2.5.8</span>
+                    Zeiterfassung Pro <span class="text-xs text-blue-300 ml-2 opacity-70">v2.5.9</span>
                 </h1>
                 <div class="flex items-center gap-2">
                     <div id="syncStatus"
@@ -612,6 +612,15 @@
                 <input type="file" id="importFile" accept=".json"
                     class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm" onchange="importJSON()">
                 <p class="text-xs text-br-300">JSON-Backup importieren (Daten werden hinzugefügt)</p>
+            </div>
+
+            <div class="bg-br-800 rounded-xl p-4 border border-yellow-800 space-y-4">
+                <h3 class="font-medium text-yellow-500">🔧 Wartung</h3>
+                <button onclick="fixPauseDurations()"
+                    class="w-full py-3 bg-yellow-900/40 hover:bg-yellow-900/60 border border-yellow-800 rounded-lg text-sm font-medium text-yellow-200">
+                    ⏱️ Alte Pausenzeiten neuberechnen
+                </button>
+                <p class="text-xs text-br-300">Berechnet die Stunden für existierende "Pause"-Einträge neu.</p>
             </div>
 
             <div class="bg-br-800 rounded-xl p-4 border border-red-900 space-y-4">

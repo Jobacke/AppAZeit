@@ -1,7 +1,7 @@
 import { state } from '../store.js';
 import { addEntry, updateEntry, deleteEntryFromDB } from './db.js';
 import { showToast, formatDate } from './ui.js';
-import { firebase } from '../config.js';
+import { firebase, db } from '../config.js';
 
 export function initEntries() {
     window.addManualEntry = addManualEntry;
@@ -14,6 +14,7 @@ export function initEntries() {
     window.filterChanged = true;
     window.filterEntries = filterEntries;
     window.toggleSortOrder = toggleSortOrder;
+    window.fixPauseDurations = fixPauseDurations;
 }
 
 export function addManualEntry() {
@@ -214,6 +215,46 @@ export function changeEntriesPageSize(size) {
 export function toggleSortOrder() {
     state.sortOrderDescending = !state.sortOrderDescending;
     filterEntries();
+}
+
+export async function fixPauseDurations() {
+    if (!state.currentUser) return;
+    if (!confirm('Sollen alle bestehenden "Pause"-Einträge (die aktuell 0h haben) nachträglich berechnet werden?')) return;
+
+    const pauseEntries = state.entries.filter(e => e.projekt === 'Pause' && (!e.stunden || e.stunden === 0));
+
+    if (pauseEntries.length === 0) {
+        showToast('ℹ️ Keine Einträge gefunden, die korrigiert werden müssen.');
+        return;
+    }
+
+    showToast(`⏳ Korrigiere ${pauseEntries.length} Einträge...`);
+
+    // Process in batches of 400 to be safe (limit is 500)
+    const chunkSize = 400;
+    for (let i = 0; i < pauseEntries.length; i += chunkSize) {
+        const chunk = pauseEntries.slice(i, i + chunkSize);
+        const batch = db.batch();
+        let ops = 0;
+
+        chunk.forEach(e => {
+            if (e.start && e.ende) {
+                const newHours = calculateHours(e.start, e.ende);
+                // Only update if we actually calculated a value > 0
+                if (newHours > 0) {
+                    const ref = db.collection('users').doc(state.currentUser.uid).collection('entries').doc(e.id);
+                    batch.update(ref, { stunden: newHours });
+                    ops++;
+                }
+            }
+        });
+
+        if (ops > 0) {
+            await batch.commit();
+        }
+    }
+
+    showToast(`✅ ${pauseEntries.length} Pausen-Einträge aktualisiert.`);
 }
 
 // Helpers
