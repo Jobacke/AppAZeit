@@ -8,8 +8,8 @@ export default defineConfig({
             manifestFilename: 'manifest.json',
             includeAssets: ['icon-192.png', 'icon-512.png'],
             manifest: {
-                name: 'Zeiterfassung Pro',
-                short_name: 'Zeiterfassung',
+                name: "App a' Zeit",
+                short_name: "App a' Zeit",
                 description: 'Professionelle Arbeitszeiterfassung',
                 start_url: '/',
                 scope: '/',

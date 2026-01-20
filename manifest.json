@@ -1,6 +1,6 @@
 {
-    "name": "Zeiterfassung Pro",
-    "short_name": "Zeiterfassung",
+    "name": "App a' Zeit",
+    "short_name": "App a' Zeit",
     "description": "Professionelle Arbeitszeiterfassung",
     "start_url": "./index.html",
     "display": "standalone",
