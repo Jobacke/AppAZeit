@@ -14,7 +14,6 @@ export function initEntries() {
     window.filterChanged = true;
     window.filterEntries = filterEntries;
     window.toggleSortOrder = toggleSortOrder;
-    window.fixPauseDurations = fixPauseDurations;
 }
 
 export function addManualEntry() {
