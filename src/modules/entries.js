@@ -1,7 +1,7 @@
 import { state } from '../store.js';
 import { addEntry, updateEntry, deleteEntryFromDB } from './db.js';
 import { showToast, formatDate } from './ui.js';
-import { firebase, db } from '../config.js';
+import { firebase } from '../config.js';
 
 export function initEntries() {
     window.addManualEntry = addManualEntry;
