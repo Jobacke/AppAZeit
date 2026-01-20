@@ -119,11 +119,14 @@ export function updateTodayView() {
 
     todayEntries.forEach(e => {
         const hours = parseFloat(e.stunden || 0);
-        totalHours += hours;
-        if (e.homeoffice) {
-            hoHours += hours;
-        } else {
-            officeHours += hours;
+
+        if (e.projekt !== 'Pause') {
+            totalHours += hours;
+            if (e.homeoffice) {
+                hoHours += hours;
+            } else {
+                officeHours += hours;
+            }
         }
     });
 

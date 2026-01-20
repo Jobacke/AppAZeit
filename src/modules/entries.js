@@ -37,7 +37,7 @@ export function addManualEntry() {
         projekt,
         taetigkeit: activity,
         homeoffice: document.getElementById('manualLocation').value === 'true',
-        stunden: projekt === 'Pause' ? 0 : calculateHours(start, ende),
+        stunden: calculateHours(start, ende),
         pause: 0,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -177,7 +177,7 @@ export function saveEdit() {
         ende: document.getElementById('editEnd').value,
         projekt: newProject,
         taetigkeit: document.getElementById('editActivity').value,
-        stunden: isPause ? 0 : calculateHours(document.getElementById('editStart').value, document.getElementById('editEnd').value),
+        stunden: calculateHours(document.getElementById('editStart').value, document.getElementById('editEnd').value),
         pause: pauseVal, // Update pause minutes if it is a pause entry
         homeoffice: document.getElementById('editLocation').value === 'true'
     };
