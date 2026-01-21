@@ -17,6 +17,7 @@ export function updateProjectSelects() {
     const projects = state.projects;
     const currentSelect = document.getElementById('currentProject');
     const filterSelect = document.getElementById('filterProject');
+    const dashFilterSelect = document.getElementById('dashProjectFilter');
     const editSelect = document.getElementById('editProject');
 
     if (!currentSelect) return;
@@ -28,6 +29,12 @@ export function updateProjectSelects() {
 
     currentSelect.innerHTML = '<option value="">-- Kein Projekt --</option>' + options;
     filterSelect.innerHTML = '<option value="">Alle Projekte</option>' + options;
+    if (dashFilterSelect) {
+        // Preserve selection if possible
+        const currentVal = dashFilterSelect.value;
+        dashFilterSelect.innerHTML = '<option value="">Alle Projekte</option>' + options;
+        dashFilterSelect.value = currentVal;
+    }
     if (editSelect) editSelect.innerHTML = '<option value="">-- Kein Projekt --</option>' + options;
 }
 

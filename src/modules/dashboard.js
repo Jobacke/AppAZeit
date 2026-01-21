@@ -41,16 +41,38 @@ export function updateDashboard() {
     const days = new Set();
     const projectHours = {};
 
+    const projectFilter = document.getElementById('dashProjectFilter')?.value;
+
     filtered.forEach(e => {
-        const h = parseFloat(e.stunden || 0);
         const pId = e.projekt || 'unknown';
 
+        // Apply Project Filter
+        if (projectFilter && projectFilter !== '' && pId !== projectFilter) {
+            return;
+        }
+
+        const h = parseFloat(e.stunden || 0);
+
+        // Special handling for Pause
         if (pId === 'Pause') {
-            // Pause nicht zur Arbeitszeit zählen, aber für Chart berechnen
             const pauseDuration = parseFloat(e.stunden || 0);
+
+            // If we are explicitly filtering for "Pause", we treat it as the main stat for "Total Hours" context
+            // otherwise verify if user wants to see it. 
+            // Standard logic: exclude from TOTAL WORK HOURS if mixed with others.
+            // If filtered specifically for Pause, we likely want to see the sum.
+
+            if (projectFilter === 'Pause') {
+                totalHours += pauseDuration;
+                if (e.homeoffice) hoHours += pauseDuration;
+                else officeHours += pauseDuration;
+                days.add(e.datum);
+            }
 
             if (!projectHours[pId]) projectHours[pId] = 0;
             projectHours[pId] += pauseDuration;
+
+            // If NOT filtered for Pause (i.e. 'All Projects'), we continue to exclude it from totals
             return;
         }
 
