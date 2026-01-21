@@ -10,6 +10,21 @@ export function initDashboard() {
 export function setDashboardPeriod(period) {
     state.dashboardPeriod = period;
 
+    // Update active button styles
+    const periods = ['week', 'month', 'year', 'all', 'custom'];
+    periods.forEach(p => {
+        const btn = document.getElementById(`dash-${p}`);
+        if (btn) {
+            if (p === period) {
+                btn.classList.remove('bg-br-700');
+                btn.classList.add('bg-br-500');
+            } else {
+                btn.classList.remove('bg-br-500');
+                btn.classList.add('bg-br-700');
+            }
+        }
+    });
+
     // Toggle date range visibility
     const dateRange = document.getElementById('dashboardDateRange');
     if (dateRange) {
