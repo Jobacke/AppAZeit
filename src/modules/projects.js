@@ -106,6 +106,11 @@ export async function saveProjectEdit() {
         return;
     }
 
+    if (newName.includes('/') || newName.includes('\\')) {
+        alert("Projektname darf keine Schrägstriche ('/' oder '\\') enthalten.\nBitte verwenden Sie Bindestriche oder Unterstriche.");
+        return;
+    }
+
     try {
         const batch = db.batch();
         const userRef = db.collection('users').doc(state.currentUser.uid);
