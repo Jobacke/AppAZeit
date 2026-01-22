@@ -112,19 +112,21 @@ export async function saveProjectEdit() {
     }
 
     try {
+        if (!db || !firebase) throw new Error('Database connection invalid');
+
         const batch = db.batch();
         const userRef = db.collection('users').doc(state.currentUser.uid);
 
         // 1. Update/Create Project Doc
         if (newName !== originalName) {
-            // Check if target name already exists to avoid overwrite (unless user intends to merge, but simple check is safer)
+            // Check existence
             if (state.projects[newName]) {
                 if (!confirm(`Ein Projekt mit dem Namen "${newName}" existiert bereits. Möchtest du die Projekte zusammenführen?`)) {
                     return;
                 }
             }
 
-            // Create new project doc
+            // Create new (safe)
             const newProjectRef = userRef.collection('projects').doc(newName);
             batch.set(newProjectRef, {
                 name: newName,
@@ -132,25 +134,48 @@ export async function saveProjectEdit() {
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Delete old project doc
-            const oldProjectRef = userRef.collection('projects').doc(originalName);
-            batch.delete(oldProjectRef);
+            // Prepare to delete old
+            let deleteOldSuccess = false;
+            try {
+                if (originalName.includes('/') || originalName.includes('\\')) {
+                    console.warn("Old project name has invalid characters, skipping delete to avoid crash:", originalName);
+                } else {
+                    const oldProjectRef = userRef.collection('projects').doc(originalName);
+                    batch.delete(oldProjectRef);
+                    deleteOldSuccess = true;
+                }
+            } catch (refError) {
+                console.warn("Could not create ref for old project:", refError);
+            }
 
-            // 2. Update all associated entries
+            // Update Entries
             const entriesSnapshot = await userRef.collection('entries').where('projekt', '==', originalName).get();
-
             entriesSnapshot.forEach(doc => {
                 batch.update(doc.ref, { projekt: newName });
             });
+            console.log(`Migrating ${entriesSnapshot.size} entries.`);
+
+            await batch.commit();
+
+            if (!deleteOldSuccess && (originalName.includes('/') || originalName.includes('\\'))) {
+                alert("✅ Projekt wurde kopiert und Einträge verschoben.\n\nDas alte Projekt konnte aufgrund des Sonderzeichens ('/') nicht automatisch gelöscht werden. Es ist jetzt leer und kann ignoriert werden.");
+            } else {
+                showToast('✅ Projekt umbenannt & Einträge migriert');
+            }
 
         } else {
-            // Only color changed
+            // Only color changed - easy case
+            if (originalName.includes('/') || originalName.includes('\\')) {
+                alert("⚠️ Dieses Projekt hat einen ungültigen Namen ('/'). Bitte benennen Sie es erst um (ohne Sonderzeichen), bevor Sie die Farbe ändern.");
+                return;
+            }
+
             const projectRef = userRef.collection('projects').doc(originalName);
             batch.update(projectRef, { color: newColor });
+            await batch.commit();
+            showToast('✅ Farbe aktualisiert');
         }
 
-        await batch.commit();
-        showToast('✅ Projekt gespeichert');
         closeEditProjectModal();
 
     } catch (err) {
