@@ -1,5 +1,5 @@
 import { state } from '../store.js';
-import { db } from '../config.js';
+import { db, firebase } from '../config.js';
 import { showToast } from './ui.js';
 
 export function initProjects() {
@@ -7,6 +7,8 @@ export function initProjects() {
     window.editProject = editProject;
     window.deleteProject = deleteProject;
     window.renderProjects = renderProjects;
+    window.closeEditProjectModal = closeEditProjectModal;
+    window.saveProjectEdit = saveProjectEdit;
 }
 
 export function initializeProjects() {
@@ -71,20 +73,84 @@ export async function addProject() {
     showToast('✅ Projekt erstellt');
 }
 
-export async function editProject(name) {
+export function editProject(name) {
     const project = state.projects[name];
     if (!project) return;
 
-    const newName = prompt("Neuer Projektname:", name);
-    if (newName && newName !== name) {
-        // Create new, delete old (Firestore doc ID is the name)
-        await db.collection('users').doc(state.currentUser.uid).collection('projects').doc(newName).set({
-            name: newName,
-            color: project.color,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        await db.collection('users').doc(state.currentUser.uid).collection('projects').doc(name).delete();
-        showToast('✅ Projekt umbenannt');
+    state.editingProjectName = name; // Store original name
+
+    document.getElementById('editProjectNameInput').value = name;
+    document.getElementById('editProjectColorInput').value = project.color;
+
+    const modal = document.getElementById('editProjectModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+export function closeEditProjectModal() {
+    const modal = document.getElementById('editProjectModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    state.editingProjectName = null;
+}
+
+export async function saveProjectEdit() {
+    const originalName = state.editingProjectName;
+    if (!originalName) return;
+
+    const newName = document.getElementById('editProjectNameInput').value.trim();
+    const newColor = document.getElementById('editProjectColorInput').value;
+
+    if (!newName) {
+        alert("Projektname darf nicht leer sein!");
+        return;
+    }
+
+    try {
+        const batch = db.batch();
+        const userRef = db.collection('users').doc(state.currentUser.uid);
+
+        // 1. Update/Create Project Doc
+        if (newName !== originalName) {
+            // Check if target name already exists to avoid overwrite (unless user intends to merge, but simple check is safer)
+            if (state.projects[newName]) {
+                if (!confirm(`Ein Projekt mit dem Namen "${newName}" existiert bereits. Möchtest du die Projekte zusammenführen?`)) {
+                    return;
+                }
+            }
+
+            // Create new project doc
+            const newProjectRef = userRef.collection('projects').doc(newName);
+            batch.set(newProjectRef, {
+                name: newName,
+                color: newColor,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Delete old project doc
+            const oldProjectRef = userRef.collection('projects').doc(originalName);
+            batch.delete(oldProjectRef);
+
+            // 2. Update all associated entries
+            const entriesSnapshot = await userRef.collection('entries').where('projekt', '==', originalName).get();
+
+            entriesSnapshot.forEach(doc => {
+                batch.update(doc.ref, { projekt: newName });
+            });
+
+        } else {
+            // Only color changed
+            const projectRef = userRef.collection('projects').doc(originalName);
+            batch.update(projectRef, { color: newColor });
+        }
+
+        await batch.commit();
+        showToast('✅ Projekt gespeichert');
+        closeEditProjectModal();
+
+    } catch (err) {
+        console.error("Error saving project:", err);
+        alert("Fehler beim Speichern: " + err.message);
     }
 }
 
