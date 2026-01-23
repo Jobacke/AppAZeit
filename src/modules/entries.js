@@ -16,6 +16,7 @@ export function initEntries() {
     window.filterChanged = true;
     window.filterEntries = filterEntries;
     window.toggleSortOrder = toggleSortOrder;
+    window.fixVacationEntries = fixVacationEntries;
 }
 
 const VACATION_PROJECT = 'Urlaub';
@@ -71,7 +72,7 @@ export function addManualEntry() {
         ende: isVacation ? '00:00' : document.getElementById('manualEnd').value,
         projekt: projectInput,
         taetigkeit: isVacation ? (activity || 'Urlaub') : activity,
-        homeoffice: document.getElementById('manualLocation').value === 'true',
+        homeoffice: isVacation ? null : (document.getElementById('manualLocation').value === 'true'),
         stunden: isVacation ? VACATION_HOURS : calculateHours(document.getElementById('manualStart').value, document.getElementById('manualEnd').value),
         pause: 0,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -235,7 +236,7 @@ export function saveEdit() {
             taetigkeit: document.getElementById('editActivity').value || 'Urlaub',
             stunden: VACATION_HOURS,
             pause: 0,
-            homeoffice: document.getElementById('editLocation').value === 'true'
+            homeoffice: null
         };
     } else {
         const start = document.getElementById('editStart').value;
@@ -298,4 +299,46 @@ function calculateHours(start, ende) {
     const min1 = h1 * 60 + m1;
     const min2 = h2 * 60 + m2;
     return Math.round((min2 - min1) / 60 * 100) / 100;
+}
+
+export async function fixVacationEntries() {
+    const vacationEntries = state.entries.filter(e => isVacationProject(e.projekt));
+
+    if (vacationEntries.length === 0) {
+        alert("Keine Urlaubseinträge gefunden.");
+        return;
+    }
+
+    if (!confirm(`${vacationEntries.length} Urlaubseinträge gefunden.\n\nSollen diese auf den neuen Standard (7.8h, Ganztägig, Nicht anwesend) aktualisiert werden?`)) {
+        return;
+    }
+
+    try {
+        const batch = firebase.firestore().batch();
+        let count = 0;
+
+        vacationEntries.forEach(entry => {
+            if (entry.start !== '00:00' || entry.ende !== '00:00' || entry.stunden !== VACATION_HOURS || entry.homeoffice !== null) {
+                const ref = firebase.firestore().collection('users').doc(state.currentUser.uid).collection('entries').doc(entry.id);
+                batch.update(ref, {
+                    start: '00:00',
+                    ende: '00:00',
+                    stunden: VACATION_HOURS,
+                    homeoffice: null
+                });
+                count++;
+            }
+        });
+
+        if (count > 0) {
+            await batch.commit();
+            showToast(`✅ ${count} Urlaubseinträge aktualisiert.`);
+        } else {
+            showToast("Alle Urlaubseinträge sind bereits aktuell.");
+        }
+
+    } catch (e) {
+        console.error("Fix Check failed", e);
+        alert("Fehler bei der Aktualisierung: " + e.message);
+    }
 }
