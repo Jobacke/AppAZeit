@@ -1,5 +1,5 @@
 import { state } from '../store.js';
-import { filterEntries } from './entries.js';
+import { filterEntries, isVacationProject } from './entries.js';
 import { renderProjects } from './projects.js';
 import { updateDashboard } from './dashboard.js';
 import { renderTasks } from './tasks.js';
@@ -208,7 +208,7 @@ export function updateTodayView() {
             todayEntries.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
 
             listContainer.innerHTML = todayEntries.map(e => {
-                const isVacation = e.projekt && e.projekt.toLowerCase() === 'urlaub';
+                const isVacation = isVacationProject(e.projekt);
                 const timeDisplay = isVacation ? '☀️ Ganztägig' : `${e.start} - ${e.ende}`;
 
                 // Determine Location Icon

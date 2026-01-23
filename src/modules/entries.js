@@ -22,8 +22,10 @@ export function initEntries() {
 const VACATION_PROJECT = 'Urlaub';
 const VACATION_HOURS = 7.8;
 
-function isVacationProject(p) {
-    return p && p.toLowerCase() === 'urlaub';
+export function isVacationProject(p) {
+    if (!p) return false;
+    const lower = p.toLowerCase();
+    return lower === 'urlaub' || lower === 'feiertag';
 }
 
 export function addManualEntry() {
@@ -309,7 +311,7 @@ export async function fixVacationEntries() {
         return;
     }
 
-    if (!confirm(`${vacationEntries.length} Urlaubseinträge gefunden.\n\nSollen diese auf den neuen Standard (7.8h, Ganztägig, Nicht anwesend) aktualisiert werden?`)) {
+    if (!confirm(`${vacationEntries.length} Urlaubs- & Feiertagseinträge gefunden.\n\nSollen diese auf den neuen Standard (7.8h, Ganztägig, Nicht anwesend) aktualisiert werden?`)) {
         return;
     }
 
@@ -332,7 +334,7 @@ export async function fixVacationEntries() {
 
         if (count > 0) {
             await batch.commit();
-            showToast(`✅ ${count} Urlaubseinträge aktualisiert.`);
+            showToast(`✅ ${count} Einträge aktualisiert.`);
 
             // Refresh UI to show new icons
             if (window.filterEntries) window.filterEntries();
@@ -340,7 +342,7 @@ export async function fixVacationEntries() {
             if (window.updateDashboard) window.updateDashboard();
 
         } else {
-            showToast("Alle Urlaubseinträge sind bereits aktuell.");
+            showToast("Alle Einträge sind bereits aktuell.");
         }
 
     } catch (e) {
