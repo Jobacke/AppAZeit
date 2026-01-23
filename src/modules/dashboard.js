@@ -79,8 +79,10 @@ export function updateDashboard() {
 
             if (projectFilter === 'Pause') {
                 totalHours += pauseDuration;
-                if (e.homeoffice) hoHours += pauseDuration;
-                else officeHours += pauseDuration;
+                // Only count HO/Office if explicitly set (technically Pause shouldn't happen "nowhere" but legacy might differ)
+                if (e.homeoffice === true) hoHours += pauseDuration;
+                else if (e.homeoffice === false) officeHours += pauseDuration;
+
                 days.add(e.datum);
             }
 
@@ -94,8 +96,12 @@ export function updateDashboard() {
         totalHours += h;
         days.add(e.datum);
 
-        if (e.homeoffice) hoHours += h;
-        else officeHours += h;
+        // Homeoffice vs Office Logic (exclude Vacation/Null)
+        if (e.homeoffice === true) {
+            hoHours += h;
+        } else if (e.homeoffice === false) {
+            officeHours += h;
+        }
 
         if (!projectHours[pId]) projectHours[pId] = 0;
         projectHours[pId] += h;

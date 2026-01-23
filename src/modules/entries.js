@@ -333,6 +333,12 @@ export async function fixVacationEntries() {
         if (count > 0) {
             await batch.commit();
             showToast(`✅ ${count} Urlaubseinträge aktualisiert.`);
+
+            // Refresh UI to show new icons
+            if (window.filterEntries) window.filterEntries();
+            if (window.updateTodayView) window.updateTodayView();
+            if (window.updateDashboard) window.updateDashboard();
+
         } else {
             showToast("Alle Urlaubseinträge sind bereits aktuell.");
         }
