@@ -103,6 +103,40 @@ export function initUI() {
 
     // Attach Tab listeners
     window.showTab = showTab;
+
+    // Attach Project Change Listeners for Vacation Mode
+    const checkVacationInput = (selectId, ...idsToToggle) => {
+        const el = document.getElementById(selectId);
+        if (!el) return;
+        el.addEventListener('change', () => {
+            const isVacation = el.value.toLowerCase() === 'urlaub';
+            idsToToggle.forEach(id => {
+                const target = document.getElementById(id);
+                if (target) {
+                    if (isVacation) {
+                        target.parentElement.classList.add('hidden'); // Hide wrapper div usually
+                        // Or just disable/hide input. Let's try hiding the parent div for cleaner UI if structure permits.
+                        // Looking at HTML, inputs are wrapped in divs with labels.
+                        // Let's just hide the input + label container.
+                        // Actually, `addManualEntry` structure: 
+                        // <div> <label>Start</label> <input id="manualStart"> </div>
+                        // So target.parentElement is the container.
+                        target.parentElement.style.opacity = '0';
+                        target.parentElement.style.pointerEvents = 'none';
+                    } else {
+                        target.parentElement.style.opacity = '1';
+                        target.parentElement.style.pointerEvents = 'auto';
+                    }
+                }
+            });
+        });
+    };
+
+    // For Manual Entry: Hide ManualStart, ManualEnd
+    checkVacationInput('currentProject', 'manualStart', 'manualEnd');
+
+    // For Edit Entry: Hide EditStart, EditEnd
+    checkVacationInput('editProject', 'editStart', 'editEnd');
 }
 
 
@@ -131,6 +165,8 @@ export function updateTodayView() {
     });
 
     // Update Progress Bar
+    // Logic: If I have vacation (7.8h), totalHours will be 7.8. 
+    // Target is 7.8. It matches 100%. "Sollarbeitszeit reduce by 7.8" effectively means we met the target.
     const targetHours = 7.8;
     const rawPercentage = (totalHours / targetHours) * 100;
     const displayPercentage = Math.round(rawPercentage);
@@ -171,12 +207,16 @@ export function updateTodayView() {
             // Sort by start time
             todayEntries.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
 
-            listContainer.innerHTML = todayEntries.map(e => `
+            listContainer.innerHTML = todayEntries.map(e => {
+                const isVacation = e.projekt && e.projekt.toLowerCase() === 'urlaub';
+                const timeDisplay = isVacation ? '☀️ Ganztägig' : `${e.start} - ${e.ende}`;
+
+                return `
                 <div class="p-3 border-b border-br-600 flex items-center justify-between hover:bg-br-700/50 transition-colors">
                     <div class="flex items-center gap-3">
                         <div class="w-1 h-8 rounded" style="background: ${state.projects[e.projekt]?.color || '#6B7280'}"></div>
                         <div>
-                            <div class="text-sm font-medium">${e.start} - ${e.ende}</div>
+                            <div class="text-sm font-medium">${timeDisplay}</div>
                             <div class="text-xs text-br-200">${e.projekt || 'Allgemein'} • ${e.taetigkeit || '-'}</div>
                         </div>
                     </div>
@@ -185,7 +225,7 @@ export function updateTodayView() {
                         <div class="text-xs">${e.homeoffice ? '🏠' : '🏢'}</div>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
     }
 }
