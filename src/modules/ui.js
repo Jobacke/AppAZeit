@@ -211,6 +211,14 @@ export function updateTodayView() {
                 const isVacation = e.projekt && e.projekt.toLowerCase() === 'urlaub';
                 const timeDisplay = isVacation ? '☀️ Ganztägig' : `${e.start} - ${e.ende}`;
 
+                // Determine Location Icon
+                let locIcon = '🏢';
+                if (isVacation || e.homeoffice === null) {
+                    locIcon = '🌴';
+                } else if (e.homeoffice) {
+                    locIcon = '🏠';
+                }
+
                 return `
                 <div class="p-3 border-b border-br-600 flex items-center justify-between hover:bg-br-700/50 transition-colors">
                     <div class="flex items-center gap-3">
@@ -222,7 +230,7 @@ export function updateTodayView() {
                     </div>
                     <div class="text-right">
                         <div class="font-mono text-sm">${(e.stunden || 0).toFixed(2)}h</div>
-                        <div class="text-xs">${e.homeoffice ? '🏠' : '🏢'}</div>
+                        <div class="text-xs">${locIcon}</div>
                     </div>
                 </div>
             `}).join('');
