@@ -102,7 +102,7 @@ export function exportPDF() {
 
         // Hintergrundfarbe pro Tag alternierend
         if (dayCounter % 2 === 0) {
-            doc.setFillColor(240, 255, 240); // Dezentes Grün
+            doc.setFillColor(255, 240, 240); // Dezentes Rot
             doc.rect(10, y - 4, 277, rowHeight, 'F');
         }
 
