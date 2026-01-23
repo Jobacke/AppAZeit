@@ -2,6 +2,7 @@ import { state } from '../store.js';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import { showToast, formatDate } from './ui.js';
+import { isVacationProject } from './entries.js';
 
 export function initExport() {
     window.exportXLSX = exportXLSX;
@@ -120,7 +121,12 @@ export function exportPDF() {
         doc.text(e.start || '', 195, y);
         doc.text(e.ende || '', 212, y);
         doc.text((e.stunden || 0).toFixed(2), 230, y);
-        doc.text(e.homeoffice ? 'HO' : 'Büro', 250, y);
+
+        let locText = e.homeoffice ? 'HO' : 'Büro';
+        if (e.homeoffice === null || (e.projekte && e.projekte.some(p => isVacationProject(p)))) {
+            locText = 'Abwesend';
+        }
+        doc.text(locText, 250, y);
 
         y += rowHeight;
     });
@@ -276,15 +282,21 @@ export function exportXLSX() {
         return (a.start || '').localeCompare(b.start || '');
     });
 
-    const formattedData = dataToExport.map(e => ({
-        Datum: formatDate(e.datum),
-        Start: e.start,
-        Ende: e.ende,
-        Projekt: e.projekt || '',
-        Tätigkeit: e.taetigkeit || '',
-        Stunden: e.stunden,
-        Ort: e.homeoffice ? 'Homeoffice' : 'Büro'
-    }));
+    const formattedData = dataToExport.map(e => {
+        let locText = e.homeoffice ? 'Homeoffice' : 'Büro';
+        if (e.homeoffice === null || isVacationProject(e.projekt)) {
+            locText = 'Abwesend';
+        }
+        return {
+            Datum: formatDate(e.datum),
+            Start: e.start,
+            Ende: e.ende,
+            Projekt: e.projekt || '',
+            Tätigkeit: e.taetigkeit || '',
+            Stunden: e.stunden,
+            Ort: locText
+        };
+    });
 
     const ws = XLSX.utils.json_to_sheet(formattedData);
     const wb = XLSX.utils.book_new();
@@ -303,15 +315,21 @@ export function exportCSV() {
     const headers = ['Datum', 'Start', 'Ende', 'Projekt', 'Tätigkeit', 'Stunden', 'Ort'];
     const csvContent = [
         headers.join(';'),
-        ...dataToExport.map(e => [
-            formatDate(e.datum),
-            e.start,
-            e.ende,
-            e.projekt || '',
-            e.taetigkeit || '',
-            e.stunden,
-            e.homeoffice ? 'Homeoffice' : 'Büro'
-        ].join(';'))
+        ...dataToExport.map(e => {
+            let locText = e.homeoffice ? 'Homeoffice' : 'Büro';
+            if (e.homeoffice === null || isVacationProject(e.projekt)) {
+                locText = 'Abwesend';
+            }
+            return [
+                formatDate(e.datum),
+                e.start,
+                e.ende,
+                e.projekt || '',
+                e.taetigkeit || '',
+                e.stunden,
+                locText
+            ].join(';');
+        })
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
