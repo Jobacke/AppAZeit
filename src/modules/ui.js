@@ -105,38 +105,36 @@ export function initUI() {
     window.showTab = showTab;
 
     // Attach Project Change Listeners for Vacation Mode
+    // Attach Project Change Listeners for Vacation Mode
     const checkVacationInput = (selectId, ...idsToToggle) => {
         const el = document.getElementById(selectId);
         if (!el) return;
-        el.addEventListener('change', () => {
-            const isVacation = el.value.toLowerCase() === 'urlaub';
+
+        const handler = () => {
+            const isVacation = isVacationProject(el.value);
             idsToToggle.forEach(id => {
                 const target = document.getElementById(id);
-                if (target) {
+                if (target && target.parentElement) {
                     if (isVacation) {
-                        target.parentElement.classList.add('hidden'); // Hide wrapper div usually
-                        // Or just disable/hide input. Let's try hiding the parent div for cleaner UI if structure permits.
-                        // Looking at HTML, inputs are wrapped in divs with labels.
-                        // Let's just hide the input + label container.
-                        // Actually, `addManualEntry` structure: 
-                        // <div> <label>Start</label> <input id="manualStart"> </div>
-                        // So target.parentElement is the container.
-                        target.parentElement.style.opacity = '0';
-                        target.parentElement.style.pointerEvents = 'none';
+                        target.parentElement.classList.add('hidden');
                     } else {
-                        target.parentElement.style.opacity = '1';
-                        target.parentElement.style.pointerEvents = 'auto';
+                        target.parentElement.classList.remove('hidden');
                     }
                 }
             });
-        });
+        };
+
+        el.addEventListener('change', handler);
+        // Also run immediately in case of default selection or cached value
+        // But initUI runs once. For Add Manual, default is empty.
+        // For Edit, editEntry triggers change event manually.
     };
 
-    // For Manual Entry: Hide ManualStart, ManualEnd
-    checkVacationInput('currentProject', 'manualStart', 'manualEnd');
+    // For Manual Entry: Hide ManualStart, ManualEnd, ManualLocation
+    checkVacationInput('currentProject', 'manualStart', 'manualEnd', 'manualLocation');
 
-    // For Edit Entry: Hide EditStart, EditEnd
-    checkVacationInput('editProject', 'editStart', 'editEnd');
+    // For Edit Entry: Hide EditStart, EditEnd, EditLocation
+    checkVacationInput('editProject', 'editStart', 'editEnd', 'editLocation');
 }
 
 
