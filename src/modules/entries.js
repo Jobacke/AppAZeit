@@ -155,6 +155,14 @@ export function filterEntries() {
             const isVacation = isVacationProject(e.projekt);
             const timeDisplay = isVacation ? 'Ganztägig' : `${e.start} - ${e.ende}`;
 
+            // Determine Location Icon
+            let locIcon = '🏢';
+            if (isVacation || e.homeoffice === null) {
+                locIcon = '🌴';
+            } else if (e.homeoffice) {
+                locIcon = '🏠';
+            }
+
             return `
              <div class="bg-br-800 rounded-lg p-3 border border-br-600 flex items-center gap-3">
                 <div class="w-1 h-12 rounded" style="background: ${e.projekt === 'Pause' ? '#60A5FA' : (state.projects[e.projekt]?.color || '#6B7280')}"></div>
@@ -165,7 +173,7 @@ export function filterEntries() {
                 </div>
                 <div class="text-right">
                     <div class="font-mono">${(e.stunden || 0).toFixed(2)}h</div>
-                    <div class="text-xs">${e.homeoffice ? '🏠' : '🏢'}</div>
+                    <div class="text-xs">${locIcon}</div>
                 </div>
                 <button onclick="editEntry('${e.id}')" class="p-2 hover:bg-br-600 rounded">✏️</button>
                 <button onclick="deleteEntry('${e.id}')" class="p-2 hover:bg-red-900 rounded">🗑️</button>
@@ -311,7 +319,7 @@ export async function fixVacationEntries() {
         return;
     }
 
-    if (!confirm(`${vacationEntries.length} Urlaubs- & Feiertagseinträge gefunden.\n\nSollen diese auf den neuen Standard (7.8h, Ganztägig, Nicht anwesend) aktualisiert werden?`)) {
+    if (!confirm(`${vacationEntries.length} Urlaubs - & Feiertagseinträge gefunden.\n\nSollen diese auf den neuen Standard(7.8h, Ganztägig, Nicht anwesend) aktualisiert werden ? `)) {
         return;
     }
 
