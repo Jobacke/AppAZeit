@@ -11,6 +11,7 @@
     <title>App a' Zeit</title>
 
     <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" href="/icon.png">
 
 
 
@@ -153,6 +154,8 @@
                 class="flex-1 py-3 text-sm font-medium tab-active whitespace-nowrap px-2">⏱️ Timer</button>
             <button onclick="showTab('tasks')" id="tab-tasks"
                 class="flex-1 py-3 text-sm font-medium text-br-200 whitespace-nowrap px-2">✅ Aufgaben</button>
+            <button onclick="showTab('calendar')" id="tab-calendar"
+                class="flex-1 py-3 text-sm font-medium text-br-200 whitespace-nowrap px-2">📅 Termine</button>
             <button onclick="showTab('entries')" id="tab-entries"
                 class="flex-1 py-3 text-sm font-medium text-br-200 whitespace-nowrap px-2">📋 Einträge</button>
             <button onclick="showTab('projects')" id="tab-projects"
@@ -447,6 +450,72 @@
             </div>
         </div>
 
+        <!-- Calendar Tab -->
+        <div id="content-calendar" class="p-4 space-y-4 hidden">
+            <!-- Add Appointment Button -->
+            <div class="bg-br-800 rounded-xl p-4 border border-br-600 flex justify-between items-center shadow-lg">
+                <div>
+                    <h3 class="font-bold text-white text-lg">📅 Termine</h3>
+                    <p class="text-xs text-br-300">Exchange & App Termine</p>
+                </div>
+                <button onclick="addAppointment()"
+                    class="bg-accent-600 hover:bg-accent-500 text-white p-3 rounded-full shadow-lg transition-transform active:scale-95">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Filter Section (Segmented Control) -->
+            <div class="bg-br-800 p-1 rounded-xl border border-br-600 flex gap-1">
+                <button onclick="setCalendarFilter('all')" id="filter-btn-all"
+                    class="flex-1 py-2 px-3 text-xs font-medium rounded-lg bg-br-600 text-white shadow transition-all">
+                    Alle
+                </button>
+                <button onclick="setCalendarFilter('exchange')" id="filter-btn-exchange"
+                    class="flex-1 py-2 px-3 text-xs font-medium rounded-lg text-br-300 hover:text-white transition-all">
+                    Outlook
+                </button>
+                <button onclick="setCalendarFilter('manual')" id="filter-btn-manual"
+                    class="flex-1 py-2 px-3 text-xs font-medium rounded-lg text-br-300 hover:text-white transition-all">
+                    App
+                </button>
+            </div>
+
+            <!-- Import / Reset Section -->
+            <div class="bg-br-800 rounded-xl p-4 border border-br-600">
+                <details>
+                    <summary class="cursor-pointer text-sm font-medium text-br-300 hover:text-white transition-colors">
+                        ⚙️ Kalender Einstellungen (Import/Reset)
+                    </summary>
+                    <div class="mt-4 space-y-3 pt-3 border-t border-br-700">
+                        <div class="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                            <h4 class="text-red-400 text-sm font-bold mb-1">⚠️ Reset & Import</h4>
+                            <p class="text-xs text-br-300 mb-3">
+                                Lädt eine .ics Datei hoch und <strong>LÖSCHT dabei alle bestehenden Termine</strong>
+                                (App & Exchange), um Duplikate zu vermeiden.
+                            </p>
+                            <label class="block w-full">
+                                <span class="sr-only">ICS Datei wählen</span>
+                                <input type="file" accept=".ics" onchange="handleIcsUpload(this)" class="block w-full text-sm text-br-300
+                                    file:mr-4 file:py-2 file:px-4
+                                    file:rounded-full file:border-0
+                                    file:text-xs file:font-semibold
+                                    file:bg-red-600 file:text-white
+                                    hover:file:bg-red-700 cursor-pointer" />
+                            </label>
+                        </div>
+                    </div>
+                </details>
+            </div>
+
+            <!-- Calendar List -->
+            <div id="calendar-events-list" class="space-y-4 pb-20">
+                <!-- Javascript will render events here -->
+            </div>
+        </div>
+
         <!-- Einträge Tab -->
         <div id="content-entries" class="p-4 space-y-4 hidden">
             <div class="flex gap-2">
@@ -732,7 +801,8 @@
                 <button onclick="closeEditModal()"
                     class="flex-1 py-3 bg-br-700 hover:bg-br-600 rounded-lg text-sm">Abbrechen</button>
                 <button onclick="saveEdit()"
-                    class="flex-1 py-3 bg-br-500 hover:bg-br-400 rounded-lg text-sm font-medium">💾 Speichern</button>
+                    class="flex-1 py-3 bg-br-500 hover:bg-br-400 rounded-lg text-sm font-medium">💾
+                    Speichern</button>
             </div>
         </div>
     </div>
@@ -818,10 +888,104 @@
                 <button onclick="closeEditProjectModal()"
                     class="flex-1 py-3 bg-br-700 hover:bg-br-600 rounded-lg text-sm">Abbrechen</button>
                 <button onclick="saveProjectEdit()"
-                    class="flex-1 py-3 bg-br-500 hover:bg-br-400 rounded-lg text-sm font-medium">💾 Speichern</button>
+                    class="flex-1 py-3 bg-br-500 hover:bg-br-400 rounded-lg text-sm font-medium">💾
+                    Speichern</button>
             </div>
         </div>
     </div>
+    <!-- Appointment Edit Modal -->
+    <div id="editAppointmentModal"
+        class="fixed inset-0 z-50 hidden items-center justify-center modal-backdrop bg-black/80">
+        <div class="bg-br-800 rounded-2xl p-6 m-4 max-w-md w-full border border-br-600 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modalTitleAppt" class="text-lg font-bold text-white">✨ Neuer Termin</h3>
+                <button onclick="closeEditAppointmentModal()"
+                    class="text-br-200 hover:text-white text-2xl">&times;</button>
+            </div>
+
+            <input type="hidden" id="apptId">
+
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs text-br-300 block mb-1">Betreff *</label>
+                    <input type="text" id="apptSubject"
+                        class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-white placeholder-br-400 focus:border-accent-500 outline-none"
+                        placeholder="Termin Titel">
+                </div>
+
+                <div>
+                    <label class="text-xs text-br-300 block mb-1">Ort</label>
+                    <input type="text" id="apptLocation"
+                        class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-white placeholder-br-400 focus:border-accent-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-br-300 block mb-1">Start *</label>
+                        <input type="datetime-local" id="apptStart"
+                            class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-white text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-br-300 block mb-1">Ende</label>
+                        <input type="datetime-local" id="apptEnd"
+                            class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-white text-sm">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="apptAllDay"
+                        class="w-4 h-4 rounded border-br-500 bg-br-700 text-accent-500 focus:ring-accent-500">
+                    <label for="apptAllDay" class="text-sm text-br-200">Ganztägig</label>
+                </div>
+
+                <div>
+                    <label class="text-xs text-br-300 block mb-1">Beschreibung</label>
+                    <textarea id="apptDescription" rows="3"
+                        class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-white placeholder-br-400 focus:border-accent-500 outline-none resize-none"></textarea>
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button type="button" id="btnDeleteAppt"
+                    class="hidden p-3 bg-red-900/50 text-red-400 rounded-lg hover:bg-red-900 border border-red-800">
+                    🗑️
+                </button>
+                <button onclick="saveAppointment()"
+                    class="flex-1 py-3 bg-accent-600 hover:bg-accent-500 text-white rounded-lg font-bold shadow-lg shadow-accent-500/20">
+                    Speichern
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Confirm Modal (Custom HTML Alert) -->
+    <div id="resetConfirmModal"
+        class="fixed inset-0 z-[200] hidden flex items-center justify-center modal-backdrop bg-black/90 backdrop-blur-sm">
+        <div class="bg-br-800 rounded-2xl p-6 m-4 max-w-sm w-full border border-red-500 shadow-2xl">
+            <div class="flex flex-col items-center text-center">
+                <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
+                    <span class="text-3xl">⚠️</span>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">Achtung!</h3>
+                <p class="text-br-200 text-sm mb-6 leading-relaxed">
+                    Dies wird <strong>ALLE bestehenden Termine</strong> (App & Exchange) unwiderruflich löschen und
+                    durch den Inhalt der Datei ersetzen.<br><br>
+                    Wirklich fortfahren?
+                </p>
+                <div class="flex gap-3 w-full">
+                    <button onclick="cancelReset()"
+                        class="flex-1 py-3 bg-br-700 hover:bg-br-600 text-white rounded-lg font-medium">
+                        Abbrechen
+                    </button>
+                    <button onclick="executeReset()"
+                        class="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold shadow-lg shadow-red-500/30">
+                        Alles löschen & Importieren
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="/src/main.js"></script>
 </body>
 
