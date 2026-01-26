@@ -201,7 +201,8 @@ async function editAppointment(id, type) {
     document.getElementById('apptStart').value = data.start || '';
     document.getElementById('apptEnd').value = data.end || '';
     document.getElementById('apptAllDay').checked = data.allDay || false;
-    document.getElementById('apptDescription').value = data.description || '';
+    const cleanDesc = (data.description || '').trim();
+    document.getElementById('apptDescription').value = cleanDesc === '{' ? '' : cleanDesc;
 
     document.getElementById('btnDeleteAppt').classList.remove('hidden');
     document.getElementById('btnDeleteAppt').onclick = () => deleteAppointment(id);
