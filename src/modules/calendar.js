@@ -30,25 +30,29 @@ export function renderCalendar() {
     const container = document.getElementById('calendar-events-list');
     if (!container) return;
 
+    if (!state.currentUser) {
+        container.innerHTML = '<div class="text-br-300 p-4 text-center">Bitte anmelden.</div>';
+        return;
+    }
+
     container.innerHTML = '<div class="text-center p-4"><div class="spinner"></div></div>';
 
-    Promise.all([
-        db.collection('app_events').get()
-    ]).then(([appSnap]) => {
-        let events = [];
+    db.collection('users').doc(state.currentUser.uid).collection('appointments').get()
+        .then(snapshot => {
+            let events = [];
 
-        appSnap.forEach(doc => {
-            events.push({ id: doc.id, ...doc.data(), type: 'app' });
+            snapshot.forEach(doc => {
+                events.push({ id: doc.id, ...doc.data(), type: 'app' });
+            });
+
+            // Filter valid dates and Sort
+            cachedEvents = events.filter(e => e.start).sort((a, b) => new Date(a.start) - new Date(b.start));
+            renderEventsList(cachedEvents);
+
+        }).catch(err => {
+            console.error("Error loading calendar:", err);
+            container.innerHTML = `<div class="text-red-400 p-4">Fehler beim Laden: ${err.message}</div>`;
         });
-
-        // Filter valid dates and Sort
-        cachedEvents = events.filter(e => e.start).sort((a, b) => new Date(a.start) - new Date(b.start));
-        renderEventsList(cachedEvents);
-
-    }).catch(err => {
-        console.error("Error loading calendar:", err);
-        container.innerHTML = `<div class="text-red-400 p-4">Fehler beim Laden: ${err.message}</div>`;
-    });
 }
 
 function renderEventsList(events) {
@@ -150,7 +154,8 @@ async function editAppointment(id, type) {
         return;
     }
 
-    const doc = await db.collection('app_events').doc(id).get();
+    if (!state.currentUser) return;
+    const doc = await db.collection('users').doc(state.currentUser.uid).collection('appointments').doc(id).get();
     if (!doc.exists) return;
     const data = doc.data();
 
@@ -197,13 +202,16 @@ async function saveAppointment() {
     };
 
     try {
+        if (!state.currentUser) throw new Error("Nicht angemeldet");
+        const collection = db.collection('users').doc(state.currentUser.uid).collection('appointments');
+
         if (id) {
-            await db.collection('app_events').doc(id).update(data);
+            await collection.doc(id).update(data);
             showToast('Termin aktualisiert');
         } else {
             data.createdAt = new Date();
             data.source = 'manual';
-            await db.collection('app_events').add(data);
+            await collection.add(data);
             showToast('Termin erstellt');
         }
         closeEditAppointmentModal();
@@ -217,7 +225,8 @@ async function saveAppointment() {
 async function deleteAppointment(id) {
     if (!confirm('Termin wirklich löschen?')) return;
     try {
-        await db.collection('app_events').doc(id).delete();
+        if (!state.currentUser) return;
+        await db.collection('users').doc(state.currentUser.uid).collection('appointments').doc(id).delete();
         showToast('Termin gelöscht');
         closeEditAppointmentModal();
         renderCalendar();
@@ -285,17 +294,18 @@ async function executeReset() {
             return;
         }
 
-        const collectionRef = db.collection('app_events');
+        if (!state.currentUser) {
+            alert('Fehler: Nicht angemeldet.');
+            return;
+        }
 
-        console.log("Cleaning up ALL old data (Full Reset)...");
+        const collectionRef = db.collection('users').doc(state.currentUser.uid).collection('appointments');
 
-        // A) Delete ALL 'app_events'
-        const appEventsSnapshot = await collectionRef.get();
-        await deleteInBatches(db, appEventsSnapshot.docs);
+        console.log("Cleaning up old data...");
 
-        // B) Delete ALL 'exchange_events'
-        const exchangeSnapshot = await db.collection('exchange_events').get();
-        await deleteInBatches(db, exchangeSnapshot.docs);
+        // Delete ALL appointments for this user
+        const snapshot = await collectionRef.get();
+        await deleteInBatches(db, snapshot.docs);
 
         // --- IMPORT NEW ---
         console.log("Starting upload of new events...");
