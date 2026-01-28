@@ -41,27 +41,48 @@ export function renderCalendar() {
 
     container.innerHTML = '<div class="text-center p-4"><div class="spinner"></div></div>';
 
-    // Use onSnapshot (Realtime) which is often more robust with permissions if rules allow it
-    // We try to query efficiently
-    let query = db.collection('app_events');
+    // Strategy: Try Global Unfiltered -> Global Filtered (UID) -> Private User Collection
+    const startListener = (query, isFallback = false) => {
+        return query.onSnapshot(snapshot => {
+            let events = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                events.push({ id: doc.id, ...data, type: 'app' });
+            });
+            cachedEvents = events.filter(e => e.start).sort((a, b) => new Date(a.start) - new Date(b.start));
+            renderEventsList(cachedEvents);
+        }, err => {
+            console.warn("Calendar load error (Attempt):", err);
 
-    unsubscribe = query.onSnapshot(snapshot => {
-        let events = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            events.push({ id: doc.id, ...data, type: 'app' });
+            if (err.code === 'permission-denied') {
+                if (!isFallback) {
+                    console.log("Falling back to UID-filtered query...");
+                    // Try fallback: Filter by UID (common Firestore rule requirement)
+                    const fallbackQuery = db.collection('app_events').where('uid', '==', state.currentUser.uid);
+                    unsubscribe = startListener(fallbackQuery, true);
+                    return;
+                } else {
+                    // If filtered global also fails, try private collection as last resort
+                    console.log("Falling back to private user collection...");
+                    const privateQuery = db.collection('users').doc(state.currentUser.uid).collection('appointments');
+                    // We define a simplified error handler for the final fallback to prevent infinite loops
+                    unsubscribe = privateQuery.onSnapshot(snap => {
+                        let events = [];
+                        snap.forEach(doc => { events.push({ id: doc.id, ...doc.data(), type: 'app' }); });
+                        cachedEvents = events.filter(e => e.start).sort((a, b) => new Date(a.start) - new Date(b.start));
+                        renderEventsList(cachedEvents);
+                    }, finalErr => {
+                        container.innerHTML = `<div class="text-red-400 p-4">Zugriff verweigert. Ersteller kontaktieren.</div>`;
+                    });
+                    return;
+                }
+            }
+            container.innerHTML = `<div class="text-red-400 p-4">Fehler: ${err.message}</div>`;
         });
+    };
 
-        cachedEvents = events.filter(e => e.start).sort((a, b) => new Date(a.start) - new Date(b.start));
-        renderEventsList(cachedEvents);
-
-    }, err => {
-        console.error("Error loading calendar:", err);
-        const msg = err.code === 'permission-denied'
-            ? 'Zugriff verweigert. Bitte melde dich neu an oder kontaktiere den Admin.'
-            : err.message;
-        container.innerHTML = `<div class="text-red-400 p-4">Fehler: ${msg}</div>`;
-    });
+    // First Attempt: Global collection
+    unsubscribe = startListener(db.collection('app_events'));
 }
 
 function renderEventsList(events) {
