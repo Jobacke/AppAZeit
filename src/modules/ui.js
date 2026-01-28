@@ -74,7 +74,7 @@ export function setSyncStatus(status) {
 }
 
 export function showTab(tabName) {
-    ['timer', 'tasks', 'calendar', 'entries', 'projects', 'dashboard', 'export'].forEach(t => {
+    ['timer', 'tasks', 'entries', 'projects', 'dashboard', 'export'].forEach(t => {
         document.getElementById(`content-${t}`)?.classList.add('hidden');
         document.getElementById(`tab-${t}`)?.classList.remove('tab-active');
         document.getElementById(`tab-${t}`)?.classList.add('text-br-200');
@@ -88,7 +88,7 @@ export function showTab(tabName) {
     if (tabName === 'projects') window.renderProjects && window.renderProjects();
     if (tabName === 'dashboard') window.updateDashboard && window.updateDashboard();
     if (tabName === 'tasks') window.renderTasks && window.renderTasks();
-    if (tabName === 'calendar') window.renderCalendar && window.renderCalendar();
+
 }
 
 export function initUI() {
