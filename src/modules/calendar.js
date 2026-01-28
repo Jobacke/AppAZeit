@@ -33,17 +33,12 @@ export function renderCalendar() {
     container.innerHTML = '<div class="text-center p-4"><div class="spinner"></div></div>';
 
     Promise.all([
-        db.collection('app_events').get(),
-        db.collection('exchange_events').get()
-    ]).then(([appSnap, exSnap]) => {
+        db.collection('app_events').get()
+    ]).then(([appSnap]) => {
         let events = [];
 
         appSnap.forEach(doc => {
             events.push({ id: doc.id, ...doc.data(), type: 'app' });
-        });
-
-        exSnap.forEach(doc => {
-            events.push({ id: doc.id, ...doc.data(), type: 'exchange' });
         });
 
         // Filter valid dates and Sort
