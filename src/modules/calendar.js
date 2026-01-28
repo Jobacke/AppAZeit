@@ -7,6 +7,7 @@ import { showToast, formatDate } from './ui.js';
 let pendingImportFile = null;
 let pendingImportInput = null;
 let cachedEvents = [];
+let unsubscribe = null;
 
 
 export function initCalendar() {
@@ -35,28 +36,32 @@ export function renderCalendar() {
         return;
     }
 
+    // Prevent multiple listeners
+    if (unsubscribe) unsubscribe();
+
     container.innerHTML = '<div class="text-center p-4"><div class="spinner"></div></div>';
 
-    db.collection('app_events').get()
-        .then(snapshot => {
-            let events = [];
+    // Use onSnapshot (Realtime) which is often more robust with permissions if rules allow it
+    // We try to query efficiently
+    let query = db.collection('app_events');
 
-            snapshot.forEach(doc => {
-                events.push({ id: doc.id, ...doc.data(), type: 'app' });
-            });
-
-            // Filter valid dates and Sort
-            cachedEvents = events.filter(e => e.start).sort((a, b) => new Date(a.start) - new Date(b.start));
-            renderEventsList(cachedEvents);
-
-        }).catch(err => {
-            console.error("Error loading calendar:", err);
-            // If permission error, show clearer message but don't crash everything if possible
-            const msg = err.code === 'permission-denied'
-                ? 'Zugriff auf globale Termine verweigert. Bitte Admin kontaktieren.'
-                : err.message;
-            container.innerHTML = `<div class="text-red-400 p-4">Fehler beim Laden: ${msg}</div>`;
+    unsubscribe = query.onSnapshot(snapshot => {
+        let events = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            events.push({ id: doc.id, ...data, type: 'app' });
         });
+
+        cachedEvents = events.filter(e => e.start).sort((a, b) => new Date(a.start) - new Date(b.start));
+        renderEventsList(cachedEvents);
+
+    }, err => {
+        console.error("Error loading calendar:", err);
+        const msg = err.code === 'permission-denied'
+            ? 'Zugriff verweigert. Bitte melde dich neu an oder kontaktiere den Admin.'
+            : err.message;
+        container.innerHTML = `<div class="text-red-400 p-4">Fehler: ${msg}</div>`;
+    });
 }
 
 function renderEventsList(events) {
