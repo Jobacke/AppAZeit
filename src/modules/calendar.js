@@ -7,7 +7,7 @@ import { showToast, formatDate } from './ui.js';
 let pendingImportFile = null;
 let pendingImportInput = null;
 let cachedEvents = [];
-let currentFilter = 'all';
+
 
 export function initCalendar() {
     window.addAppointment = addAppointment;
@@ -17,46 +17,14 @@ export function initCalendar() {
     window.closeEditAppointmentModal = closeEditAppointmentModal;
     window.renderCalendar = renderCalendar;
     window.handleIcsUpload = handleIcsUpload;
-    window.setCalendarFilter = setCalendarFilter;
+
 
     // Modal buttons
     window.executeReset = executeReset;
     window.cancelReset = cancelReset;
 }
 
-function setCalendarFilter(val) {
-    currentFilter = val;
 
-    // Update UI
-    ['all', 'exchange', 'manual'].forEach(type => {
-        const btn = document.getElementById(`filter-btn-${type}`);
-        if (btn) {
-            if (type === val) {
-                btn.classList.add('bg-br-600', 'text-white', 'shadow');
-                btn.classList.remove('text-br-300');
-            } else {
-                btn.classList.remove('bg-br-600', 'text-white', 'shadow');
-                btn.classList.add('text-br-300');
-            }
-        }
-    });
-
-    applyFilterAndRender();
-}
-
-function applyFilterAndRender() {
-    let events = [...cachedEvents];
-
-    if (currentFilter === 'exchange') {
-        // Exchange means: Real Exchange Sync OR Imported (ICS)
-        events = events.filter(e => e.type === 'exchange' || e.source === 'imported');
-    } else if (currentFilter === 'manual') {
-        // Manual means: Strictly created in the App manually
-        events = events.filter(e => e.source === 'manual');
-    }
-
-    renderEventsList(events);
-}
 
 export function renderCalendar() {
     const container = document.getElementById('calendar-events-list');
@@ -80,7 +48,7 @@ export function renderCalendar() {
 
         // Filter valid dates and Sort
         cachedEvents = events.filter(e => e.start).sort((a, b) => new Date(a.start) - new Date(b.start));
-        applyFilterAndRender();
+        renderEventsList(cachedEvents);
 
     }).catch(err => {
         console.error("Error loading calendar:", err);
