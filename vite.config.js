@@ -7,7 +7,7 @@ export default defineConfig({
         VitePWA({
             registerType: 'autoUpdate',
             manifestFilename: 'manifest.json',
-            includeAssets: ['icon-192.png', 'icon-512.png'],
+            includeAssets: ['icon-192-v2.png', 'icon-512-v2.png'],
             manifest: {
                 name: "App a' Zeit",
                 short_name: "App a' Zeit",
@@ -19,12 +19,12 @@ export default defineConfig({
                 display: 'standalone',
                 icons: [
                     {
-                        src: 'icon-192.png',
+                        src: 'icon-192-v2.png',
                         sizes: '192x192',
                         type: 'image/png'
                     },
                     {
-                        src: 'icon-512.png',
+                        src: 'icon-512-v2.png',
                         sizes: '512x512',
                         type: 'image/png'
                     }
