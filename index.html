@@ -116,7 +116,7 @@
         <!-- Header -->
         <header class="bg-gradient-to-r from-blue-800 to-blue-600 p-4 sticky top-0 z-40 shadow-lg">
             <div class="flex items-center justify-between">
-                Zeiterfassung Pro <span class="text-xs text-blue-300 ml-2 opacity-70">v3.6.2</span>
+                Zeiterfassung Pro <span class="text-xs text-blue-300 ml-2 opacity-70">v3.6.3</span>
                 <div class="flex items-center gap-2">
                     <div id="syncStatus"
                         class="sync-indicator text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
@@ -466,32 +466,7 @@
 
 
 
-            <!-- Import / Reset Section -->
-            <div class="bg-br-800 rounded-xl p-4 border border-br-600">
-                <details>
-                    <summary class="cursor-pointer text-sm font-medium text-br-300 hover:text-white transition-colors">
-                        ⚙️ Kalender Einstellungen (Import/Reset)
-                    </summary>
-                    <div class="mt-4 space-y-3 pt-3 border-t border-br-700">
-                        <div class="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-                            <h4 class="text-red-400 text-sm font-bold mb-1">⚠️ Reset & Import</h4>
-                            <p class="text-xs text-br-300 mb-3">
-                                Lädt eine .ics Datei hoch und <strong>LÖSCHT dabei alle bestehenden Termine</strong>
-                                (App & Exchange), um Duplikate zu vermeiden.
-                            </p>
-                            <label class="block w-full">
-                                <span class="sr-only">ICS Datei wählen</span>
-                                <input type="file" accept=".ics" onchange="handleIcsUpload(this)" class="block w-full text-sm text-br-300
-                                    file:mr-4 file:py-2 file:px-4
-                                    file:rounded-full file:border-0
-                                    file:text-xs file:font-semibold
-                                    file:bg-red-600 file:text-white
-                                    hover:file:bg-red-700 cursor-pointer" />
-                            </label>
-                        </div>
-                    </div>
-                </details>
-            </div>
+            <!-- Import / Reset Section REMOVED -->
 
             <!-- Calendar List -->
             <div id="calendar-events-list" class="space-y-4 pb-20">

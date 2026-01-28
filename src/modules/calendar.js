@@ -37,7 +37,7 @@ export function renderCalendar() {
 
     container.innerHTML = '<div class="text-center p-4"><div class="spinner"></div></div>';
 
-    db.collection('users').doc(state.currentUser.uid).collection('appointments').get()
+    db.collection('app_events').get()
         .then(snapshot => {
             let events = [];
 
@@ -51,7 +51,11 @@ export function renderCalendar() {
 
         }).catch(err => {
             console.error("Error loading calendar:", err);
-            container.innerHTML = `<div class="text-red-400 p-4">Fehler beim Laden: ${err.message}</div>`;
+            // If permission error, show clearer message but don't crash everything if possible
+            const msg = err.code === 'permission-denied'
+                ? 'Zugriff auf globale Termine verweigert. Bitte Admin kontaktieren.'
+                : err.message;
+            container.innerHTML = `<div class="text-red-400 p-4">Fehler beim Laden: ${msg}</div>`;
         });
 }
 
@@ -154,8 +158,14 @@ async function editAppointment(id, type) {
         return;
     }
 
-    if (!state.currentUser) return;
-    const doc = await db.collection('users').doc(state.currentUser.uid).collection('appointments').doc(id).get();
+    // We try global collection first
+    let doc = await db.collection('app_events').doc(id).get();
+
+    // If not found, check user specific (migration fallback, though we are reverting to global)
+    if (!doc.exists && state.currentUser) {
+        doc = await db.collection('users').doc(state.currentUser.uid).collection('appointments').doc(id).get();
+    }
+
     if (!doc.exists) return;
     const data = doc.data();
 
@@ -203,7 +213,9 @@ async function saveAppointment() {
 
     try {
         if (!state.currentUser) throw new Error("Nicht angemeldet");
-        const collection = db.collection('users').doc(state.currentUser.uid).collection('appointments');
+
+        // REVERT to global 'app_events' as requested by user to restore old data context
+        const collection = db.collection('app_events');
 
         if (id) {
             await collection.doc(id).update(data);
@@ -211,6 +223,8 @@ async function saveAppointment() {
         } else {
             data.createdAt = new Date();
             data.source = 'manual';
+            // We might want to save UID to filter later if rules change
+            data.uid = state.currentUser.uid;
             await collection.add(data);
             showToast('Termin erstellt');
         }
@@ -225,13 +239,24 @@ async function saveAppointment() {
 async function deleteAppointment(id) {
     if (!confirm('Termin wirklich löschen?')) return;
     try {
-        if (!state.currentUser) return;
-        await db.collection('users').doc(state.currentUser.uid).collection('appointments').doc(id).delete();
+        // Try deleting from global first
+        await db.collection('app_events').doc(id).delete();
+
         showToast('Termin gelöscht');
         closeEditAppointmentModal();
         renderCalendar();
     } catch (e) {
         console.error(e);
+        // If permission denied or not found there, try user collection just in case
+        if (state.currentUser) {
+            try {
+                await db.collection('users').doc(state.currentUser.uid).collection('appointments').doc(id).delete();
+                showToast('Termin gelöscht (User DB)');
+                closeEditAppointmentModal();
+                renderCalendar();
+                return;
+            } catch (inner) { console.log("Also not in user db"); }
+        }
         showToast('Fehler beim Löschen', 'error');
     }
 }
@@ -299,11 +324,13 @@ async function executeReset() {
             return;
         }
 
-        const collectionRef = db.collection('users').doc(state.currentUser.uid).collection('appointments');
+        const collectionRef = db.collection('app_events');
 
         console.log("Cleaning up old data...");
 
-        // Delete ALL appointments for this user
+        // Delete ALL appointments in global app_events 
+        // WARNING: This deletes for EVERYONE if rules allow. 
+        // But user requested "Rest & Import" feature to work as before.
         const snapshot = await collectionRef.get();
         await deleteInBatches(db, snapshot.docs);
 
