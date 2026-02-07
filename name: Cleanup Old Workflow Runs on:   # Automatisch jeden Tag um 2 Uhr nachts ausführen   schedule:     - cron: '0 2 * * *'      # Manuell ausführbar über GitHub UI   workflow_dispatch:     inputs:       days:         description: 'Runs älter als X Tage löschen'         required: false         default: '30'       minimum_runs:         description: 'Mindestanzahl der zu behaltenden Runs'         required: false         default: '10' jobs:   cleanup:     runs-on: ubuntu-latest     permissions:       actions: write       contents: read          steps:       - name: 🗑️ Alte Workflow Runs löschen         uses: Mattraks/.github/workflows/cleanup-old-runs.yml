@@ -1,0 +1,42 @@
+name: Cleanup Old Workflow Runs
+on:
+  # Automatisch jeden Tag um 2 Uhr nachts ausführen
+  schedule:
+    - cron: '0 2 * * *'
+  
+  # Manuell ausführbar über GitHub UI
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Runs älter als X Tage löschen'
+        required: false
+        default: '30'
+      minimum_runs:
+        description: 'Mindestanzahl der zu behaltenden Runs'
+        required: false
+        default: '10'
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    
+    steps:
+      - name: 🗑️ Alte Workflow Runs löschen
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          # Alle Runs älter als 30 Tage löschen
+          retain_days: ${{ github.event.inputs.days || 30 }}
+          
+          # Mindestens die letzten 10 Runs behalten
+          keep_minimum_runs: ${{ github.event.inputs.minimum_runs || 10 }}
+          
+          # Auch fehlgeschlagene Runs löschen
+          delete_workflow_pattern: 'all'
+          
+      - name: ✅ Zusammenfassung
+        run: |
+          echo "🎉 Alte Workflow Runs wurden gelöscht!"
+          echo "📅 Gelöscht: Runs älter als ${{ github.event.inputs.days || 30 }} Tage"
+          echo "📊 Behalten: Mindestens ${{ github.event.inputs.minimum_runs || 10 }} Runs"
