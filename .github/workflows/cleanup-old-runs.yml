@@ -1,4 +1,5 @@
 name: Cleanup Old Workflow Runs
+
 on:
   # Automatisch jeden Tag um 2 Uhr nachts ausführen
   schedule:
@@ -10,13 +11,12 @@ on:
       days:
         description: 'Runs älter als X Tage löschen'
         required: false
-        default: '30'
-        default: '7'  # ← Geändert von 30 auf 7 Tage
+        default: '7'
       minimum_runs:
         description: 'Mindestanzahl der zu behaltenden Runs'
         required: false
-        default: '10'
-        default: '5'  # ← Geändert von 10 auf 5 Runs
+        default: '5'
+
 jobs:
   cleanup:
     runs-on: ubuntu-latest
@@ -26,27 +26,16 @@ jobs:
     
     steps:
       - name: 🗑️ Alte Workflow Runs löschen
-      - name: Alte Workflow Runs löschen
         uses: Mattraks/delete-workflow-runs@v2
         with:
-          # Alle Runs älter als 30 Tage löschen
-          retain_days: ${{ github.event.inputs.days || 30 }}
-          # Alle Runs älter als 7 Tage löschen (statt 30)
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
           retain_days: ${{ github.event.inputs.days || 7 }}
-          
-          # Mindestens die letzten 10 Runs behalten
-          keep_minimum_runs: ${{ github.event.inputs.minimum_runs || 10 }}
-          # Mindestens die letzten 5 Runs behalten (statt 10)
           keep_minimum_runs: ${{ github.event.inputs.minimum_runs || 5 }}
-          
-          # Auch fehlgeschlagene Runs löschen
-          delete_workflow_pattern: 'all'
-          
+          delete_workflow_pattern: 'all' # Löscht auch fehlgeschlagene Runs
+
       - name: ✅ Zusammenfassung
-      - name: Zusammenfassung
         run: |
           echo "🎉 Alte Workflow Runs wurden gelöscht!"
-          echo "📅 Gelöscht: Runs älter als ${{ github.event.inputs.days || 30 }} Tage"
-          echo "📊 Behalten: Mindestens ${{ github.event.inputs.minimum_runs || 10 }} Runs"
           echo "📅 Gelöscht: Runs älter als ${{ github.event.inputs.days || 7 }} Tage"
           echo "📊 Behalten: Mindestens ${{ github.event.inputs.minimum_runs || 5 }} Runs"
