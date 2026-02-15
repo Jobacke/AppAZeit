@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0066ff">
+    <meta name="apple-mobile-web-app-title" content="App a' Zeit">
+    <title>App a' Zeit</title>
+
+    <link rel="apple-touch-icon" href="icon-192-v2.png">
+    <link rel="icon" type="image/png" href="icon-v2.png">
+
+
+
+
+
+    <!-- Firebase SDK -->
+
+
+
+
+
+
+
+  <script type="module" crossorigin src="./assets/index-DYmD9scO.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DeDRkgbB.css">
+<link rel="manifest" href="./manifest.json"><script id="vite-plugin-pwa:register-sw" src="./registerSW.js"></script></head>
+
+<body class="bg-br-900 text-white min-h-screen">
+
+    <!-- ==================== LOGIN SCREEN ==================== -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-br-800 rounded-2xl p-8 max-w-md w-full border border-br-600 text-center">
+            <div class="text-6xl mb-4">📺</div>
+            <h1 class="text-2xl font-bold mb-2">Zeiterfassung BR</h1>
+            <p class="text-br-200 mb-6">Bayerischer Rundfunk Style</p>
+
+            <!-- E-Mail/Passwort Login -->
+            <div id="emailLoginForm" class="space-y-3 mb-6">
+                <input type="email" id="loginEmail" placeholder="E-Mail-Adresse"
+                    class="w-full px-4 py-3 bg-br-700 border border-br-500 rounded-xl text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                    onkeypress="if(event.key==='Enter') signInWithEmail()">
+                <input type="password" id="loginPassword" placeholder="Passwort"
+                    class="w-full px-4 py-3 bg-br-700 border border-br-500 rounded-xl text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                    onkeypress="if(event.key==='Enter') signInWithEmail()">
+                <button onclick="signInWithEmail()" id="emailLoginBtn"
+                    class="w-full py-3 bg-br-500 hover:bg-br-400 rounded-xl font-medium transition-all">
+                    📧 Mit E-Mail anmelden
+                </button>
+                <div class="flex gap-2">
+                    <button onclick="showRegisterForm()"
+                        class="flex-1 py-2 bg-br-700 hover:bg-br-600 rounded-lg text-sm transition-all">
+                        Neu registrieren
+                    </button>
+                    <button onclick="resetPassword()"
+                        class="flex-1 py-2 bg-br-700 hover:bg-br-600 rounded-lg text-sm transition-all">
+                        Passwort vergessen
+                    </button>
+                </div>
+            </div>
+
+            <!-- Registrierungsformular (versteckt) -->
+            <div id="registerForm" class="space-y-3 mb-6 hidden">
+                <input type="email" id="registerEmail" placeholder="E-Mail-Adresse"
+                    class="w-full px-4 py-3 bg-br-700 border border-br-500 rounded-xl text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                    onkeypress="if(event.key==='Enter') registerWithEmail()">
+                <input type="password" id="registerPassword" placeholder="Passwort (min. 6 Zeichen)"
+                    class="w-full px-4 py-3 bg-br-700 border border-br-500 rounded-xl text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                    onkeypress="if(event.key==='Enter') registerWithEmail()">
+                <input type="password" id="registerPasswordConfirm" placeholder="Passwort bestätigen"
+                    class="w-full px-4 py-3 bg-br-700 border border-br-500 rounded-xl text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                    onkeypress="if(event.key==='Enter') registerWithEmail()">
+                <button onclick="registerWithEmail()"
+                    class="w-full py-3 bg-green-600 hover:bg-green-500 rounded-xl font-medium transition-all">
+                    ✅ Konto erstellen
+                </button>
+                <button onclick="showLoginForm()"
+                    class="w-full py-2 bg-br-700 hover:bg-br-600 rounded-lg text-sm transition-all">
+                    ← Zurück zum Login
+                </button>
+            </div>
+
+
+
+            <div class="mt-6 text-xs text-br-300">
+                Deine Daten werden sicher in der Cloud gespeichert
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN APP ==================== -->
+    <div id="app" class="w-full max-w-[95%] mx-auto pb-20 hidden selection:bg-blue-500/30">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-blue-800 to-blue-600 p-4 sticky top-0 z-40 shadow-lg">
+            <div class="flex items-center justify-between">
+                Zeiterfassung Pro <span class="text-xs text-blue-300 ml-2 opacity-70">v3.7.0</span>
+                <div class="flex items-center gap-2">
+                    <div id="syncStatus"
+                        class="sync-indicator text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
+                        ☁️ Sync
+                    </div>
+                    <button onclick="showUserMenu()" id="userAvatar"
+                        class="w-8 h-8 rounded-full bg-br-700 overflow-hidden">
+                        <img id="userPhoto" src="" alt="" class="w-full h-full object-cover">
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- User Menu Dropdown -->
+        <div id="userMenu"
+            class="hidden absolute right-4 top-16 bg-br-800 rounded-xl border border-br-600 shadow-xl z-50 w-64">
+            <div class="p-4 border-b border-br-600">
+                <div id="userName" class="font-medium"></div>
+                <div id="userEmail" class="text-xs text-br-200"></div>
+            </div>
+            <div class="p-2">
+                <button onclick="signOut()"
+                    class="w-full text-left px-4 py-2 hover:bg-br-700 rounded-lg text-sm text-red-400">
+                    🚪 Abmelden
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="flex bg-br-800 border-b border-br-600 sticky top-16 z-30 overflow-x-auto">
+            <button onclick="showTab('timer')" id="tab-timer"
+                class="flex-1 py-3 text-sm font-medium tab-active whitespace-nowrap px-2">⏱️ Timer</button>
+            <button onclick="showTab('tasks')" id="tab-tasks"
+                class="flex-1 py-3 text-sm font-medium text-br-200 whitespace-nowrap px-2">✅ Aufgaben</button>
+
+            <button onclick="showTab('entries')" id="tab-entries"
+                class="flex-1 py-3 text-sm font-medium text-br-200 whitespace-nowrap px-2">📋 Einträge</button>
+            <button onclick="showTab('projects')" id="tab-projects"
+                class="flex-1 py-3 text-sm font-medium text-br-200 whitespace-nowrap px-2">📁 Projekte</button>
+            <button onclick="showTab('dashboard')" id="tab-dashboard"
+                class="flex-1 py-3 text-sm font-medium text-br-200 whitespace-nowrap px-2">📊 Statistiken</button>
+            <button onclick="showTab('export')" id="tab-export"
+                class="flex-1 py-3 text-sm font-medium text-br-200 whitespace-nowrap px-2">💾 Export</button>
+        </nav>
+
+        <!-- Timer Tab -->
+        <div id="content-timer" class="p-4 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start hidden">
+            <!-- Left Column: Controls -->
+            <div class="space-y-4">
+                <!-- Projekt & Ort Auswahl -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-br-200 mb-1 block">Projekt</label>
+                        <select id="currentProject"
+                            class="w-full bg-br-800 border border-br-500 rounded-lg p-3 text-sm">
+                            <option value="">-- Kein Projekt --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-br-200 mb-1 block">Arbeitsort</label>
+                        <div class="flex gap-2">
+                            <button onclick="setLocation(true)" id="btn-ho"
+                                class="flex-1 py-3 rounded-lg text-sm font-medium bg-br-500">🏠 HO</button>
+                            <button onclick="setLocation(false)" id="btn-office"
+                                class="flex-1 py-3 rounded-lg text-sm font-medium bg-br-700">🏢 Büro</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tätigkeit -->
+                <div>
+                    <label class="text-xs text-br-200 mb-1 block">Tätigkeit (optional)</label>
+                    <input type="text" id="currentActivity" placeholder="z.B. Meeting, Dokumentation..."
+                        class="w-full bg-br-800 border border-br-500 rounded-lg p-3 text-sm">
+                </div>
+
+                <!-- Timer Display -->
+                <div id="timerDisplay"
+                    class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 text-center border border-br-600">
+                    <div id="timerValue" class="text-5xl font-mono font-bold text-blue-400 mb-3">00:00:00</div>
+                    <div id="timerStatus" class="text-br-200 text-sm mb-3">Bereit zum Starten</div>
+                    <div class="flex gap-3 justify-center">
+                        <button onclick="toggleTimer()" id="btnStartStop"
+                            class="px-8 py-3 bg-green-600 hover:bg-green-500 rounded-xl text-lg font-bold transition-all">
+                            ▶️ Start
+                        </button>
+                        <button onclick="resetTimer()"
+                            class="px-5 py-3 bg-br-700 hover:bg-br-600 rounded-xl text-lg transition-all">
+                            🔄
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Countdown Option -->
+                <div class="bg-br-800 rounded-xl p-3 border border-br-600">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="useCountdown" class="w-4 h-4 rounded"
+                            onchange="toggleCountdownMode()">
+                        <label for="useCountdown" class="text-sm">Countdown-Modus</label>
+                        <input type="number" id="countdownMinutes" placeholder="Min" min="1" max="480" value="60"
+                            class="w-16 bg-br-700 border border-br-500 rounded p-1 text-sm ml-auto" disabled>
+                    </div>
+                    <div class="mt-2 flex gap-2">
+                        <button onclick="testAlarm()"
+                            class="flex-1 py-2 bg-orange-700 hover:bg-orange-600 rounded-lg text-xs font-medium">
+                            🔔 Sound
+                        </button>
+                        <button onclick="activateNotifications()" id="btnNotifyStatus"
+                            class="flex-1 py-2 bg-br-700 hover:bg-br-600 rounded-lg text-xs font-medium">
+                            🔕 Push-Nachrichten
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Stats & Lists -->
+            <div class="space-y-4">
+                <!-- Tagesstatistik: Homeoffice vs Office -->
+                <div class="bg-br-800 rounded-xl border border-br-600 p-4 space-y-3">
+                    <!-- Arbeitszeit-Fortschritt -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <h3 class="text-sm font-medium text-br-200">⏰ Arbeitszeit heute</h3>
+                            <div class="text-right">
+                                <span id="todayWorkProgress" class="text-xs font-mono text-br-300">0.0h / 7.8h</span>
+                                <span id="todayWorkPercentText" class="text-sm font-bold text-green-400 ml-2">0%</span>
+                            </div>
+                        </div>
+                        <div class="w-full h-4 bg-br-700 rounded-lg overflow-hidden relative">
+                            <div id="todayWorkBar"
+                                class="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-300 flex items-center justify-end pr-1"
+                                style="width: 0%;">
+                                <span id="todayWorkPercent"
+                                    class="text-[10px] font-bold text-br-900 leading-none"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Arbeitsort-Verteilung -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <h3 class="text-sm font-medium text-br-200">📍 Arbeitsort</h3>
+                        </div>
+                        <div class="flex gap-1 h-6 rounded-lg overflow-hidden bg-br-700">
+                            <div id="todayHoBar"
+                                class="bg-br-500 flex items-center justify-center text-xs font-medium transition-all duration-300"
+                                style="width: 50%;">
+                                <span id="todayHoLabel" class="text-white text-[10px]"></span>
+                            </div>
+                            <div id="todayOfficeBar"
+                                class="bg-blue-600 flex items-center justify-center text-xs font-medium transition-all duration-300"
+                                style="width: 50%;">
+                                <span id="todayOfficeLabel" class="text-white text-[10px]"></span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between mt-1 text-[10px] text-br-300">
+                            <span>🏠 <span id="todayHoHours">0.0h</span></span>
+                            <span>🏢 <span id="todayOfficeHours">0.0h</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Heutige Einträge -->
+                <div class="bg-br-800 rounded-xl border border-br-600">
+                    <div class="p-3 border-b border-br-600 flex justify-between items-center">
+                        <h3 class="font-medium text-sm">📅 Heute</h3>
+                        <span id="todayTotal" class="text-blue-400 font-mono text-sm">0.00 h</span>
+                    </div>
+                    <div id="todayEntries" class="max-h-96 overflow-y-auto"></div>
+                </div>
+
+                <!-- Manueller Eintrag (Collapsed by default) -->
+                <details class="bg-br-800 rounded-xl border border-br-600">
+                    <summary class="p-3 cursor-pointer text-sm font-medium">➕ Manueller Eintrag</summary>
+                    <div class="p-4 pt-0 space-y-3">
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="text-xs text-br-200">Datum</label>
+                                <input type="date" id="manualDate"
+                                    class="w-full bg-br-700 border border-br-500 rounded p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-xs text-br-200">Start</label>
+                                <input type="time" id="manualStart"
+                                    class="w-full bg-br-700 border border-br-500 rounded p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-xs text-br-200">Ende</label>
+                                <input type="time" id="manualEnd"
+                                    class="w-full bg-br-700 border border-br-500 rounded p-2 text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-br-200">Arbeitsort</label>
+                            <select id="manualLocation"
+                                class="w-full bg-br-700 border border-br-500 rounded p-2 text-sm">
+                                <option value="false">🏢 Büro</option>
+                                <option value="true">🏠 Homeoffice</option>
+                            </select>
+                        </div>
+                        <button onclick="addManualEntry()"
+                            class="w-full py-2 bg-br-500 hover:bg-br-400 rounded-lg text-sm font-medium">
+                            Hinzufügen
+                        </button>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <!-- Aufgaben Tab -->
+        <div id="content-tasks" class="p-4 space-y-4 hidden">
+            <!-- Filter-Optionen -->
+            <div class="bg-br-800 rounded-xl p-4 border border-br-600">
+                <div class="flex flex-wrap gap-2 items-center">
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" id="hideCompleted" class="w-4 h-4 rounded" onchange="renderTasks()">
+                        Erledigte ausblenden
+                    </label>
+                    <select id="filterTaskPriority" class="bg-br-700 border border-br-500 rounded-lg px-3 py-2 text-sm"
+                        onchange="renderTasks()">
+                        <option value="">Alle Prioritäten</option>
+                        <option value="hoch">🔴 Hoch</option>
+                        <option value="mittel">🟡 Mittel</option>
+                        <option value="niedrig">🟢 Niedrig</option>
+                    </select>
+                    <select id="filterTaskStatus" class="bg-br-700 border border-br-500 rounded-lg px-3 py-2 text-sm"
+                        onchange="renderTasks()">
+                        <option value="">Alle Status</option>
+                        <option value="offen">Offen</option>
+                        <option value="in bearbeitung">In Bearbeitung</option>
+                        <option value="erledigt">Erledigt</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Neue Aufgabe -->
+            <details class="bg-br-800 rounded-xl border border-br-600">
+                <summary class="p-4 cursor-pointer text-sm font-medium">➕ Neue Aufgabe</summary>
+                <div class="p-4 pt-0 space-y-3">
+                    <div>
+                        <label class="text-xs text-br-200">Aufgabe *</label>
+                        <input type="text" id="newTaskTitle" placeholder="Was muss erledigt werden?"
+                            class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-xs text-br-200">Fällig am</label>
+                            <input type="date" id="newTaskDue"
+                                class="w-full bg-br-700 border border-br-500 rounded-lg p-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs text-br-200">Priorität</label>
+                            <select id="newTaskPriority"
+                                class="w-full bg-br-700 border border-br-500 rounded-lg p-2 text-sm">
+                                <option value="mittel">🟡 Mittel</option>
+                                <option value="hoch">🔴 Hoch</option>
+                                <option value="niedrig">🟢 Niedrig</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs text-br-200">Notizen</label>
+                        <textarea id="newTaskNotes" placeholder="Zusätzliche Informationen..."
+                            class="w-full bg-br-700 border border-br-500 rounded-lg p-2 text-sm h-20"></textarea>
+                    </div>
+                    <button onclick="addTask()"
+                        class="w-full py-3 bg-br-500 hover:bg-br-400 rounded-lg text-sm font-medium">
+                        ✅ Aufgabe hinzufügen
+                    </button>
+                </div>
+            </details>
+
+            <!-- Überfällige Aufgaben -->
+            <div id="overdueTasks" class="hidden">
+                <div class="bg-red-900/30 rounded-xl border border-red-700">
+                    <div class="p-3 border-b border-red-700 flex items-center gap-2">
+                        <span class="text-red-400">⚠️</span>
+                        <h3 class="font-medium text-red-400">Überfällig</h3>
+                        <span id="overdueCount"
+                            class="ml-auto bg-red-600 text-white text-xs px-2 py-1 rounded-full">0</span>
+                    </div>
+                    <div id="overdueTasksList" class="divide-y divide-red-900"></div>
+                </div>
+            </div>
+
+            <!-- Heute fällige Aufgaben -->
+            <div id="todayTasks" class="hidden">
+                <div class="bg-orange-900/30 rounded-xl border border-orange-700">
+                    <div class="p-3 border-b border-orange-700 flex items-center gap-2">
+                        <span class="text-orange-400">📅</span>
+                        <h3 class="font-medium text-orange-400">Heute fällig</h3>
+                        <span id="todayTasksCount"
+                            class="ml-auto bg-orange-600 text-white text-xs px-2 py-1 rounded-full">0</span>
+                    </div>
+                    <div id="todayTasksList" class="divide-y divide-orange-900"></div>
+                </div>
+            </div>
+
+            <!-- Kommende Aufgaben -->
+            <div id="upcomingTasks">
+                <div class="bg-br-800 rounded-xl border border-br-600">
+                    <div class="p-3 border-b border-br-600 flex items-center gap-2">
+                        <span class="text-blue-400">📋</span>
+                        <h3 class="font-medium">Kommende Aufgaben</h3>
+                        <span id="upcomingCount"
+                            class="ml-auto bg-gray-600 text-white text-xs px-2 py-1 rounded-full">0</span>
+                    </div>
+                    <div id="upcomingTasksList" class="divide-y divide-gray-700"></div>
+                    <div id="noTasksMessage" class="p-8 text-center text-br-300 hidden">
+                        <div class="text-4xl mb-2">✨</div>
+                        <p>Keine Aufgaben vorhanden</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Erledigte Aufgaben -->
+            <div id="completedTasksSection" class="hidden">
+                <details class="bg-br-800 rounded-xl border border-br-600">
+                    <summary class="p-3 cursor-pointer flex items-center gap-2">
+                        <span class="text-green-400">✅</span>
+                        <h3 class="font-medium text-br-200">Erledigte Aufgaben</h3>
+                        <span id="completedCount"
+                            class="ml-auto bg-green-600/50 text-green-300 text-xs px-2 py-1 rounded-full">0</span>
+                    </summary>
+                    <div id="completedTasksList" class="divide-y divide-gray-700"></div>
+                </details>
+            </div>
+        </div>
+
+
+
+        <!-- Einträge Tab -->
+        <div id="content-entries" class="p-4 space-y-4 hidden">
+            <div class="flex gap-2">
+                <input type="date" id="filterDate" class="flex-1 bg-br-800 border border-br-500 rounded-lg p-3 text-sm"
+                    onchange="window.filterChanged=true; window.entriesCurrentPage=1; filterEntries()">
+                <select id="filterProject" class="flex-1 bg-br-800 border border-br-500 rounded-lg p-3 text-sm"
+                    onchange="window.filterChanged=true; window.entriesCurrentPage=1; filterEntries()">
+                    <option value="">Alle Projekte</option>
+                </select>
+                <button onclick="toggleSortOrder()" id="btnSortOrder"
+                    class="px-4 bg-br-700 hover:bg-br-600 rounded-lg text-xl" title="Sortierung ändern">
+                    ⬇️
+                </button>
+            </div>
+            <div class="flex justify-between items-center">
+                <div id="entriesStatsTop" class="text-sm text-br-200"></div>
+                <select id="pageSizeTop" onchange="changeEntriesPageSize(this.value)"
+                    class="bg-br-700 border border-br-600 rounded px-2 py-1 text-sm">
+                    <option value="50">50 pro Seite</option>
+                    <option value="100">100 pro Seite</option>
+                    <option value="200">200 pro Seite</option>
+                    <option value="99999">Alle anzeigen</option>
+                </select>
+            </div>
+            <div id="entriesList" class="space-y-2"></div>
+            <div id="entriesStats" class="bg-br-800 rounded-xl p-4 text-center text-sm text-br-200"></div>
+        </div>
+
+        <!-- Projekte Tab -->
+        <div id="content-projects" class="p-4 space-y-4 hidden">
+            <div class="bg-br-800 rounded-xl p-4 border border-br-600">
+                <h3 class="font-medium mb-3">➕ Neues Projekt</h3>
+                <div class="flex gap-2">
+                    <input type="text" id="newProjectName" placeholder="Projektname"
+                        class="flex-1 bg-br-700 border border-br-500 rounded-lg p-3 text-sm">
+                    <input type="color" id="newProjectColor" value="#3B82F6"
+                        class="w-12 h-12 rounded-lg cursor-pointer">
+                    <button onclick="addProject()" class="px-4 bg-green-600 hover:bg-green-500 rounded-lg">✅</button>
+                </div>
+            </div>
+            <div id="projectsList" class="space-y-2"></div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="content-dashboard" class="p-4 space-y-4 hidden">
+            <div class="flex gap-2 flex-wrap items-center">
+                <select id="dashProjectFilter"
+                    class="bg-br-700 border border-br-500 rounded-lg p-2 text-sm max-w-[150px]"
+                    onchange="updateDashboard()">
+                    <option value="">Alle Projekte</option>
+                </select>
+                <div class="h-6 w-px bg-br-600 mx-1"></div>
+                <button onclick="setDashboardPeriod('week')" id="dash-week"
+                    class="px-4 py-2 bg-br-500 rounded-lg text-sm">Diese Woche</button>
+                <button onclick="setDashboardPeriod('month')" id="dash-month"
+                    class="px-4 py-2 bg-br-700 rounded-lg text-sm">Dieser Monat</button>
+                <button onclick="setDashboardPeriod('year')" id="dash-year"
+                    class="px-4 py-2 bg-br-700 rounded-lg text-sm">Dieses Jahr</button>
+                <button onclick="setDashboardPeriod('all')" id="dash-all"
+                    class="px-4 py-2 bg-br-700 rounded-lg text-sm">Alles</button>
+                <button onclick="setDashboardPeriod('custom')" id="dash-custom"
+                    class="px-4 py-2 bg-br-700 rounded-lg text-sm">📅 Zeitraum</button>
+            </div>
+
+            <div id="dashboardDateRange"
+                class="hidden grid grid-cols-2 gap-3 bg-br-800 rounded-xl p-3 border border-br-600">
+                <div>
+                    <label class="text-xs text-br-200 mb-1 block">Von</label>
+                    <input type="date" id="dashFrom"
+                        class="w-full bg-br-700 border border-br-500 rounded-lg p-2 text-sm"
+                        onchange="updateDashboard()">
+                </div>
+                <div>
+                    <label class="text-xs text-br-200 mb-1 block">Bis</label>
+                    <input type="date" id="dashTo" class="w-full bg-br-700 border border-br-500 rounded-lg p-2 text-sm"
+                        onchange="updateDashboard()">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="bg-gradient-to-br from-blue-900 to-blue-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold" id="statTotalHours">0</div>
+                    <div class="text-xs text-blue-300">Stunden gesamt</div>
+                </div>
+                <div class="bg-gradient-to-br from-green-900 to-green-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold" id="statAvgPerDay">0</div>
+                    <div class="text-xs text-green-300">Ø Stunden/Tag</div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-900 to-purple-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold" id="statWorkDays">0</div>
+                    <div class="text-xs text-purple-300">Arbeitstage</div>
+                </div>
+                <div class="bg-gradient-to-br from-orange-900 to-orange-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold" id="statEntries">0</div>
+                    <div class="text-xs text-orange-300">Einträge</div>
+                </div>
+            </div>
+
+            <div class="bg-br-800 rounded-xl p-4 border border-br-600">
+                <h3 class="font-medium mb-3">🏠 Homeoffice vs. 🏢 Büro</h3>
+                <div class="flex gap-4">
+                    <div class="flex-1 text-center">
+                        <div class="text-2xl font-bold text-blue-400" id="statHomeoffice">0%</div>
+                        <div class="text-xs text-br-200">Homeoffice</div>
+                    </div>
+                    <div class="flex-1 text-center">
+                        <div class="text-2xl font-bold text-orange-400" id="statOffice">0%</div>
+                        <div class="text-xs text-br-200">Büro</div>
+                    </div>
+                </div>
+                <div class="mt-3 h-4 bg-br-700 rounded-full overflow-hidden flex">
+                    <div id="hoBar" class="bg-blue-500 transition-all" style="width: 50%"></div>
+                    <div id="officeBar" class="bg-orange-500 transition-all" style="width: 50%"></div>
+                </div>
+            </div>
+
+            <div class="bg-br-800 rounded-xl p-4 border border-br-600">
+                <h3 class="font-medium mb-3">📊 Stunden nach Projekt</h3>
+                <div id="projectStats" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- Export Tab -->
+        <div id="content-export" class="p-4 space-y-4 hidden">
+            <div class="bg-br-800 rounded-xl p-4 border border-br-600 space-y-4">
+                <h3 class="font-medium">📤 Daten exportieren</h3>
+
+                <div>
+                    <label class="text-xs text-br-200 mb-1 block">Zeitraum</label>
+                    <select id="exportPeriod" class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm"
+                        onchange="toggleCustomDates()">
+                        <option value="today">Heute</option>
+                        <option value="week">Diese Woche</option>
+                        <option value="month">Dieser Monat</option>
+                        <option value="year">Dieses Jahr</option>
+                        <option value="all">Alle Einträge</option>
+                        <option value="custom">📅 Benutzerdefiniert...</option>
+                    </select>
+                </div>
+
+                <div id="customDateRange" class="grid grid-cols-2 gap-3 hidden">
+                    <div>
+                        <label class="text-xs text-br-200 mb-1 block">Von</label>
+                        <input type="date" id="exportFrom"
+                            class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-br-200 mb-1 block">Bis</label>
+                        <input type="date" id="exportTo"
+                            class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    <button onclick="exportXLSX()"
+                        class="py-3 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-medium">📊 XLSX</button>
+                    <button onclick="exportPDF()"
+                        class="py-3 bg-red-700 hover:bg-red-600 rounded-lg text-sm font-medium">📄 PDF</button>
+                    <button onclick="exportCSV()"
+                        class="py-3 bg-br-600 hover:bg-br-500 rounded-lg text-sm font-medium">📋 CSV</button>
+                    <button onclick="exportJSON()"
+                        class="py-3 bg-purple-700 hover:bg-purple-600 rounded-lg text-sm font-medium">💾 JSON</button>
+                </div>
+            </div>
+
+            <div class="bg-br-800 rounded-xl p-4 border border-br-600 space-y-4">
+                <h3 class="font-medium">📥 Daten importieren</h3>
+                <input type="file" id="importFile" accept=".json"
+                    class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm" onchange="importJSON()">
+                <p class="text-xs text-br-300">JSON-Backup importieren (Daten werden hinzugefügt)</p>
+            </div>
+
+
+
+
+
+            <div class="bg-br-800 rounded-xl p-4 border border-red-900 space-y-4">
+                <h3 class="font-medium text-red-400">⚠️ Gefahrenzone</h3>
+                <button onclick="clearAllData()"
+                    class="w-full py-3 bg-red-900 hover:bg-red-800 rounded-lg text-sm font-medium">🗑️ Alle Daten
+                    löschen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-backdrop">
+
+        <!-- Aufgaben Startbildschirm Modal -->
+        <div id="tasksDashboardModal" class="fixed inset-0 z-60 hidden items-center justify-center modal-backdrop">
+            <div
+                class="bg-br-800 rounded-2xl p-6 m-4 max-w-lg w-full border border-br-600 shadow-2xl max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        <span>📋</span> Deine Aufgaben
+                    </h2>
+                    <button onclick="closeTasksDashboard()"
+                        class="text-br-200 hover:text-white text-2xl">&times;</button>
+                </div>
+
+                <div id="dashboardTasksContent">
+                    <!-- Überfällige Aufgaben -->
+                    <div id="dashOverdue" class="mb-4 hidden">
+                        <div class="bg-red-900/40 rounded-xl border border-red-600 p-4">
+                            <h3 class="text-red-400 font-medium mb-3 flex items-center gap-2">
+                                <span>⚠️</span> Überfällig
+                            </h3>
+                            <div id="dashOverdueList" class="space-y-2"></div>
+                        </div>
+                    </div>
+
+                    <!-- Heute fällige Aufgaben -->
+                    <div id="dashToday" class="mb-4 hidden">
+                        <div class="bg-orange-900/40 rounded-xl border border-orange-600 p-4">
+                            <h3 class="text-orange-400 font-medium mb-3 flex items-center gap-2">
+                                <span>📅</span> Heute fällig
+                            </h3>
+                            <div id="dashTodayList" class="space-y-2"></div>
+                        </div>
+                    </div>
+
+                    <!-- Keine dringenden Aufgaben -->
+                    <div id="dashNoUrgent" class="text-center py-8 hidden">
+                        <div class="text-5xl mb-3">✨</div>
+                        <p class="text-br-200">Keine überfälligen oder heutigen Aufgaben!</p>
+                        <p class="text-br-300 text-sm mt-2">Du bist auf dem Laufenden.</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex gap-3">
+                    <button onclick="closeTasksDashboard()"
+                        class="flex-1 py-3 bg-br-700 hover:bg-br-600 rounded-lg text-sm font-medium">
+                        Schließen
+                    </button>
+                    <button onclick="closeTasksDashboard(); showTab('tasks');"
+                        class="flex-1 py-3 bg-br-500 hover:bg-br-400 rounded-lg text-sm font-medium">
+                        Alle Aufgaben →
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Original Edit Modal -->
+        <div class="bg-br-800 rounded-2xl p-6 m-4 max-w-md w-full border border-br-600 shadow-2xl">
+            <h3 class="text-lg font-bold mb-4">✏️ Eintrag bearbeiten</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-br-200">Datum</label>
+                    <input type="date" id="editDate"
+                        class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-br-200">Start</label>
+                        <input type="time" id="editStart"
+                            class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-br-200">Ende</label>
+                        <input type="time" id="editEnd"
+                            class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs text-br-200">Projekt</label>
+                    <select id="editProject"
+                        class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm"></select>
+                </div>
+                <div>
+                    <label class="text-xs text-br-200">Tätigkeit</label>
+                    <input type="text" id="editActivity"
+                        class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-br-200">Arbeitsort</label>
+                    <select id="editLocation" class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm">
+                        <option value="true">🏠 Homeoffice</option>
+                        <option value="false">🏢 Büro</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="closeEditModal()"
+                    class="flex-1 py-3 bg-br-700 hover:bg-br-600 rounded-lg text-sm">Abbrechen</button>
+                <button onclick="saveEdit()"
+                    class="flex-1 py-3 bg-br-500 hover:bg-br-400 rounded-lg text-sm font-medium">💾
+                    Speichern</button>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Task Edit Modal - am Ende des body für korrektes z-index Verhalten -->
+    <div id="editTaskModal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 99999; align-items: center; justify-content: center; background: rgba(0,0,0,0.8);">
+        <div
+            style="background: #1f2937; border-radius: 16px; padding: 24px; margin: 16px; max-width: 400px; width: 100%; border: 1px solid #374151; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+            <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 16px; color: white;">✏️ Aufgabe bearbeiten
+            </h3>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                    <label style="font-size: 12px; color: #9ca3af; display: block; margin-bottom: 4px;">Aufgabe</label>
+                    <input type="text" id="editTaskTitle"
+                        style="width: 100%; background: #374151; border: 1px solid #4b5563; border-radius: 8px; padding: 12px; font-size: 14px; color: white; box-sizing: border-box;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="font-size: 12px; color: #9ca3af; display: block; margin-bottom: 4px;">Fällig
+                            am</label>
+                        <input type="date" id="editTaskDue"
+                            style="width: 100%; background: #374151; border: 1px solid #4b5563; border-radius: 8px; padding: 12px; font-size: 14px; color: white; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label
+                            style="font-size: 12px; color: #9ca3af; display: block; margin-bottom: 4px;">Priorität</label>
+                        <select id="editTaskPriority"
+                            style="width: 100%; background: #374151; border: 1px solid #4b5563; border-radius: 8px; padding: 12px; font-size: 14px; color: white; box-sizing: border-box;">
+                            <option value="hoch">🔴 Hoch</option>
+                            <option value="mittel">🟡 Mittel</option>
+                            <option value="niedrig">🟢 Niedrig</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label style="font-size: 12px; color: #9ca3af; display: block; margin-bottom: 4px;">Status</label>
+                    <select id="editTaskStatus"
+                        style="width: 100%; background: #374151; border: 1px solid #4b5563; border-radius: 8px; padding: 12px; font-size: 14px; color: white; box-sizing: border-box;">
+                        <option value="offen">Offen</option>
+                        <option value="in bearbeitung">In Bearbeitung</option>
+                        <option value="erledigt">Erledigt</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 12px; color: #9ca3af; display: block; margin-bottom: 4px;">Notizen</label>
+                    <textarea id="editTaskNotes"
+                        style="width: 100%; background: #374151; border: 1px solid #4b5563; border-radius: 8px; padding: 12px; font-size: 14px; color: white; height: 80px; resize: none; box-sizing: border-box;"></textarea>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button onclick="closeEditTaskModal()"
+                    style="flex: 1; padding: 12px; background: #374151; border: none; border-radius: 8px; font-size: 14px; color: white; cursor: pointer;">Abbrechen</button>
+                <button onclick="deleteTask()"
+                    style="padding: 12px 16px; background: #dc2626; border: none; border-radius: 8px; font-size: 14px; color: white; cursor: pointer;">🗑️</button>
+                <button onclick="saveTaskEdit()"
+                    style="flex: 1; padding: 12px; background: #2563eb; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; color: white; cursor: pointer;">💾
+                    Speichern</button>
+            </div>
+        </div>
+    </div>
+    <!-- Project Edit Modal -->
+    <div id="editProjectModal" class="fixed inset-0 z-[100] hidden flex items-center justify-center modal-backdrop">
+        <div class="bg-br-800 rounded-2xl p-6 m-4 max-w-md w-full border border-br-600 shadow-2xl">
+            <h3 class="text-lg font-bold mb-4">✏️ Projekt bearbeiten</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-br-200">Projektname</label>
+                    <input type="text" id="editProjectNameInput"
+                        class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-br-200">Farbe</label>
+                    <div class="flex gap-2">
+                        <input type="color" id="editProjectColorInput"
+                            class="w-full h-12 bg-br-700 border border-br-500 rounded-lg cursor-pointer">
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="closeEditProjectModal()"
+                    class="flex-1 py-3 bg-br-700 hover:bg-br-600 rounded-lg text-sm">Abbrechen</button>
+                <button onclick="saveProjectEdit()"
+                    class="flex-1 py-3 bg-br-500 hover:bg-br-400 rounded-lg text-sm font-medium">💾
+                    Speichern</button>
+            </div>
+        </div>
+    </div>
+    <!-- Appointment Edit Modal -->
+    <div id="editAppointmentModal"
+        class="fixed inset-0 z-50 hidden items-center justify-center modal-backdrop bg-black/80">
+        <div class="bg-br-800 rounded-2xl p-6 m-4 max-w-md w-full border border-br-600 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modalTitleAppt" class="text-lg font-bold text-white">✨ Neuer Termin</h3>
+                <button onclick="closeEditAppointmentModal()"
+                    class="text-br-200 hover:text-white text-2xl">&times;</button>
+            </div>
+
+            <input type="hidden" id="apptId">
+
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs text-br-300 block mb-1">Betreff *</label>
+                    <input type="text" id="apptSubject"
+                        class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-white placeholder-br-400 focus:border-accent-500 outline-none"
+                        placeholder="Termin Titel">
+                </div>
+
+                <div>
+                    <label class="text-xs text-br-300 block mb-1">Ort</label>
+                    <input type="text" id="apptLocation"
+                        class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-white placeholder-br-400 focus:border-accent-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-br-300 block mb-1">Start *</label>
+                        <input type="datetime-local" id="apptStart"
+                            class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-white text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-br-300 block mb-1">Ende</label>
+                        <input type="datetime-local" id="apptEnd"
+                            class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-white text-sm">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="apptAllDay"
+                        class="w-4 h-4 rounded border-br-500 bg-br-700 text-accent-500 focus:ring-accent-500">
+                    <label for="apptAllDay" class="text-sm text-br-200">Ganztägig</label>
+                </div>
+
+                <div>
+                    <label class="text-xs text-br-300 block mb-1">Beschreibung</label>
+                    <textarea id="apptDescription" rows="3"
+                        class="w-full bg-br-700 border border-br-500 rounded-lg p-3 text-white placeholder-br-400 focus:border-accent-500 outline-none resize-none"></textarea>
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button type="button" id="btnDeleteAppt"
+                    class="hidden p-3 bg-red-900/50 text-red-400 rounded-lg hover:bg-red-900 border border-red-800">
+                    🗑️
+                </button>
+                <button onclick="saveAppointment()"
+                    class="flex-1 py-3 bg-accent-600 hover:bg-accent-500 text-white rounded-lg font-bold shadow-lg shadow-accent-500/20">
+                    Speichern
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Confirm Modal (Custom HTML Alert) -->
+    <div id="resetConfirmModal"
+        class="fixed inset-0 z-[200] hidden flex items-center justify-center modal-backdrop bg-black/90 backdrop-blur-sm">
+        <div class="bg-br-800 rounded-2xl p-6 m-4 max-w-sm w-full border border-red-500 shadow-2xl">
+            <div class="flex flex-col items-center text-center">
+                <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
+                    <span class="text-3xl">⚠️</span>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">Achtung!</h3>
+                <p class="text-br-200 text-sm mb-6 leading-relaxed">
+                    Dies wird <strong>ALLE bestehenden Termine</strong> (App & Exchange) unwiderruflich löschen und
+                    durch den Inhalt der Datei ersetzen.<br><br>
+                    Wirklich fortfahren?
+                </p>
+                <div class="flex gap-3 w-full">
+                    <button onclick="cancelReset()"
+                        class="flex-1 py-3 bg-br-700 hover:bg-br-600 text-white rounded-lg font-medium">
+                        Abbrechen
+                    </button>
+                    <button onclick="executeReset()"
+                        class="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold shadow-lg shadow-red-500/30">
+                        Alles löschen & Importieren
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
