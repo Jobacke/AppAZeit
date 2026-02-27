@@ -46,13 +46,13 @@ export function exportPDF() {
     // Querformat: 'l' = landscape
     const doc = new jsPDF('l', 'mm', 'a4');
 
-    doc.setFontSize(18);
-    doc.text('Zeiterfassung', 14, 22);
+    doc.setFontSize(16);
+    doc.text('Zeiterfassung', 14, 15);
     doc.setFontSize(10);
-    doc.text(`Erstellt am: ${formatDate(getToday())}`, 14, 30);
-    doc.text(`${data.length} Zeitblöcke (aus ${rawData.length} Einträgen)`, 14, 36);
+    doc.text(`Erstellt am: ${formatDate(getToday())}`, 14, 21);
+    doc.text(`${data.length} Zeitblöcke (aus ${rawData.length} Einträgen)`, 14, 26);
 
-    let y = 50;
+    let y = 35;
     doc.setFontSize(9);
     doc.setFont(undefined, 'bold');
     // Spaltenbreiten angepasst: Datum, Start, Ende, Stunden, Ort reduziert; Projekte und Tätigkeiten erweitert
@@ -88,7 +88,7 @@ export function exportPDF() {
         const activityLines = doc.splitTextToSize(actStr, 80); // Max width approx 80mm
 
         const maxLines = Math.max(projectLines.length, activityLines.length, 1);
-        const rowHeight = Math.max(6, maxLines * 4 + 2); // Dynamic height calculation
+        const rowHeight = Math.max(5.5, maxLines * 3.5 + 1.5); // Dynamic height calculation
 
         // Check page break with new rowHeight
         if (y + rowHeight > 190) { doc.addPage(); y = 20; currentDay = null; }
@@ -152,60 +152,61 @@ export function exportPDF() {
     const weekHours = avgPerDay * 5;
     const weekPercent = (weekHours / 39) * 100;
 
-    y += 5;
-    doc.setFont(undefined, 'bold');
-    doc.text(`Gesamt: ${totalHours.toFixed(2)} Stunden`, 14, y);
+    // Page break fallback just in case the rows went very far down
+    if (y + 35 > 200) {
+        doc.addPage();
+        y = 20;
+    }
 
     y += 10;
-    doc.setFontSize(11);
-    doc.text('STATISTIK', 14, y);
+    const statY = y;
+
+    // Column 1: Allgemeine Statistik
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text('STATISTIK', 14, statY);
     doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    y += 6;
-    doc.text(`Arbeitstage: ${workDays}`, 14, y);
-    y += 5;
 
-    // Ø Stunden/Tag - farblich markieren
-    const avgDayColor = avgPerDay < 7.8 ? [255, 0, 0] : [0, 170, 0]; // Rot oder Grün
-    doc.setTextColor(avgDayColor[0], avgDayColor[1], avgDayColor[2]);
+    doc.text(`Gesamt: ${totalHours.toFixed(2)} Stunden`, 14, statY + 6);
+    doc.text(`Arbeitstage: ${workDays}`, 14, statY + 11);
+
+    // Column 2: Arbeitsort
+    doc.setFontSize(10);
     doc.setFont(undefined, 'bold');
-    doc.text(`Ø Stunden/Tag: ${avgPerDay.toFixed(2)}h`, 14, y);
+    doc.text('ARBEITSORT-VERTEILUNG', 90, statY);
+    doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    doc.setTextColor(0, 0, 0); // Zurück zu Schwarz
-    y += 5;
 
-    // % zur Regelarbeitszeit - farblich markieren
-    const percentColor = percentOfRegular < 100 ? [255, 0, 0] : [0, 170, 0]; // Rot oder Grün
-    doc.setTextColor(percentColor[0], percentColor[1], percentColor[2]);
-    doc.setFont(undefined, 'bold');
-    doc.text(`Ø % zur Regelarbeitszeit (7,8h): ${percentOfRegular.toFixed(1)}%`, 14, y);
-    doc.setFont(undefined, 'normal');
-    doc.setTextColor(0, 0, 0); // Zurück zu Schwarz
-    y += 5;
+    doc.text(`Homeoffice: ${hoHours.toFixed(2)}h (${hoPct.toFixed(1)}%)`, 90, statY + 6);
 
-    // Wochenarbeitszeit - farblich markieren
-    const weekHoursColor = weekHours < 39 ? [255, 0, 0] : [0, 170, 0]; // Rot oder Grün
-    doc.setTextColor(weekHoursColor[0], weekHoursColor[1], weekHoursColor[2]);
-    doc.setFont(undefined, 'bold');
-    doc.text(`Hochrechnung Woche (5 Tage): ${weekHours.toFixed(2)}h (${weekPercent.toFixed(1)}%)`, 14, y);
-    doc.setFont(undefined, 'normal');
-    doc.setTextColor(0, 0, 0); // Zurück zu Schwarz
-
-    y += 10;
-    doc.setFont(undefined, 'bold');
-    doc.text('ARBEITSORT-VERTEILUNG', 14, y);
-    doc.setFont(undefined, 'normal');
-    y += 6;
-    doc.text(`Homeoffice: ${hoHours.toFixed(2)}h (${hoPct.toFixed(1)}%)`, 14, y);
-    y += 5;
-
-    // Büro-Prozent - farblich markieren
-    const bueroColor = officePct < 50 ? [255, 0, 0] : [0, 170, 0]; // Rot oder Grün
+    const bueroColor = officePct < 50 ? [255, 0, 0] : [0, 170, 0];
     doc.setTextColor(bueroColor[0], bueroColor[1], bueroColor[2]);
     doc.setFont(undefined, 'bold');
-    doc.text(`Büro: ${officeHours.toFixed(2)}h (${officePct.toFixed(1)}%)`, 14, y);
+    doc.text(`Büro: ${officeHours.toFixed(2)}h (${officePct.toFixed(1)}%)`, 90, statY + 11);
+    doc.setTextColor(0, 0, 0);
+
+    // Column 3: Durchschnitte & Hochrechnung
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text('DURCHSCHNITTE & HOCHRECHNUNG', 170, statY);
+    doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    doc.setTextColor(0, 0, 0); // Zurück zu Schwarz
+
+    const avgDayColor = avgPerDay < 7.8 ? [255, 0, 0] : [0, 170, 0];
+    doc.setTextColor(avgDayColor[0], avgDayColor[1], avgDayColor[2]);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Ø Stunden/Tag: ${avgPerDay.toFixed(2)}h`, 170, statY + 6);
+
+    const percentColor = percentOfRegular < 100 ? [255, 0, 0] : [0, 170, 0];
+    doc.setTextColor(percentColor[0], percentColor[1], percentColor[2]);
+    doc.text(`Ø % zur Regelarbeitszeit (7,8h): ${percentOfRegular.toFixed(1)}%`, 170, statY + 11);
+
+    const weekHoursColor = weekHours < 39 ? [255, 0, 0] : [0, 170, 0];
+    doc.setTextColor(weekHoursColor[0], weekHoursColor[1], weekHoursColor[2]);
+    doc.text(`Hochrechnung Woche (5 Tage): ${weekHours.toFixed(2)}h (${weekPercent.toFixed(1)}%)`, 170, statY + 16);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0);
 
     doc.save(`Zeiterfassung_${getToday()}.pdf`);
 }
